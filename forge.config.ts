@@ -1,4 +1,5 @@
 import { MakerDeb } from "@electron-forge/maker-deb";
+import { MakerDMG } from "@electron-forge/maker-dmg";
 import { MakerRpm } from "@electron-forge/maker-rpm";
 import { MakerSquirrel } from "@electron-forge/maker-squirrel";
 import { MakerZIP } from "@electron-forge/maker-zip";
@@ -8,6 +9,7 @@ import type { ForgeConfig } from "@electron-forge/shared-types";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 import ffmpegPath from "ffmpeg-static";
 import { path as ffprobePath } from "ffprobe-static";
+import fs from "node:fs";
 import path from "node:path";
 
 // App identity. `productName` ("Electron Xplorer") lives in package.json; the
@@ -19,9 +21,67 @@ const APP_ID = "com.ncpa0cpl.electron-xplorer";
 // that directory; the .ico/.icns files are for Windows/macOS packaging.
 const ICONS_DIR = path.resolve(__dirname, "build", "icons");
 
+// Packages the main-process bundle `require()`s at runtime in a packaged app
+// (the rest of `rollupOptions.external` in vite.shared.ts is dev-only).
+const RUNTIME_EXTERNALS = ["sharp"];
+
+function findPackageDir(name: string, fromDir: string): string | undefined {
+  for (let dir = fromDir;; dir = path.dirname(dir)) {
+    const candidate = path.join(dir, "node_modules", name);
+    if (fs.existsSync(path.join(candidate, "package.json"))) {
+      return candidate;
+    }
+    if (dir === __dirname || dir === path.dirname(dir)) {
+      return undefined;
+    }
+  }
+}
+
+/**
+ * @returns `packagerConfig.ignore`-style paths (`/node_modules/...`) of every
+ * installed package in the production dependency tree of `names`. Optional
+ * dependencies that are not installed (other platforms' sharp binaries) are
+ * skipped.
+ */
+function runtimeModulePaths(names: string[]): string[] {
+  const dirs = new Set<string>();
+  const visit = (name: string, fromDir: string, optional: boolean) => {
+    const dir = findPackageDir(name, fromDir);
+    if (!dir) {
+      if (optional) return;
+      throw new Error(`Runtime dependency "${name}" is not installed`);
+    }
+    if (dirs.has(dir)) return;
+    dirs.add(dir);
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(dir, "package.json"), "utf8"),
+    );
+    for (const dep of Object.keys(pkg.dependencies ?? {})) {
+      visit(dep, dir, false);
+    }
+    for (const dep of Object.keys(pkg.optionalDependencies ?? {})) {
+      visit(dep, dir, true);
+    }
+  };
+  for (const name of names) visit(name, __dirname, false);
+  return [...dirs].map(
+    (dir) => "/" + path.relative(__dirname, dir).split(path.sep).join("/"),
+  );
+}
+
+const PACKAGED_PATHS = [
+  "/.vite",
+  "/package.json",
+  ...runtimeModulePaths(RUNTIME_EXTERNALS),
+];
+
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true,
+    asar: {
+      // libvips is a dylib loaded by sharp's `.node` addon via a relative
+      // rpath, so both must sit side by side outside the archive.
+      unpack: "**/node_modules/{sharp,@img}/**/*",
+    },
     // copied to <app>/resources/ffmpeg(.exe) and <app>/resources/ffprobe(.exe)
     extraResource: [ffmpegPath as string, ffprobePath],
     // Stable, lowercase executable name. Without this the executable is
@@ -36,9 +96,33 @@ const config: ForgeConfig = {
     // macOS bundle icon (Linux packaging ignores it; Windows squirrel uses
     // the .ico from its maker config below).
     icon: path.join(ICONS_DIR, "icon.icns"),
-    // The `build/` directory only holds packaging-time assets (icons); it has
-    // no runtime value, so keep it out of the asar bundle.
-    ignore: [/^\/build(\/|$)/],
+    // Lets Launch Services hand folders to the app (`open-file`, see
+    // src/main/launch-handlers.ts). "Alternate" keeps Finder the default
+    // until the user picks this app explicitly.
+    extendInfo: {
+      CFBundleDocumentTypes: [
+        {
+          CFBundleTypeName: "Folder",
+          CFBundleTypeRole: "Viewer",
+          LSHandlerRank: "Alternate",
+          LSItemContentTypes: ["public.folder"],
+        },
+      ],
+    },
+    // Setting `ignore` replaces the Vite plugin's default filter (which keeps
+    // only `/.vite`), so this has to admit the Vite output plus the runtime
+    // externals, and every ancestor directory leading to them.
+    ignore: (file: string) =>
+      !!file
+      && !PACKAGED_PATHS.some(
+        (kept) =>
+          file === kept
+          || file.startsWith(kept + "/")
+          || kept.startsWith(file + "/"),
+      ),
+    // `dependencies` in package.json are mostly bundled by Vite and filtered
+    // out above; the pruner would fail looking for them.
+    prune: false,
   },
   rebuildConfig: {},
   makers: [
@@ -85,6 +169,12 @@ const config: ForgeConfig = {
           + "and the fs-explorer library.",
         productName: "Electron Xplorer",
       },
+    }),
+    new MakerDMG({
+      name: "Xplorer",
+      format: "ULFO",
+      icon: path.join(ICONS_DIR, "icon.icns"),
+      overwrite: true,
     }),
   ],
   plugins: [

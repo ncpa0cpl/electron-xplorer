@@ -33,8 +33,13 @@ export async function bootstrap(): Promise<void> {
 
     const filesystem = createFilesystem(platform);
 
+    const [launchFolder, ...extraLaunchFolders] = await window.xplorer
+      .takeLaunchFolders();
+
+    // No `await` from here until `onOpenFolders` below: folder requests that
+    // arrive in between would be dropped.
     const explorer = new Explorer(filesystem, {
-      initDir: homeDir,
+      initDir: launchFolder ?? homeDir,
       staticPlaces,
       // Double-click on a file opens it with the OS default application
       // (directories are handled by the lib itself: they navigate).
@@ -49,6 +54,15 @@ export async function bootstrap(): Promise<void> {
       // OS drag-out: hands an in-progress emulated drag to the OS when the
       // pointer leaves the window (see drag-out.ts for the hybrid model).
       nativeDragOut: nativeDragOutHandler,
+    });
+
+    for (const folder of extraLaunchFolders) {
+      explorer.newTab(folder);
+    }
+    window.xplorer.onOpenFolders((folders) => {
+      for (const folder of folders) {
+        explorer.newTab(folder);
+      }
     });
 
     registerExplorer(explorer);

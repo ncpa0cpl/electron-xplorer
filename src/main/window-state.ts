@@ -7,8 +7,8 @@ import path from "node:path";
  *
  * Persists just the window size/position/maximized flag to
  * `userData/window-state.json` (plain fs, no dependencies). Deliberately
- * NEVER persists the last visited directory: the app always opens in the
- * home directory (the Explorer is constructed with `initDir: homeDir`).
+ * NEVER persists the last visited directory: the app opens in the home
+ * directory, or in the folder it was launched with (see launch-handlers.ts).
  *
  * Restore policy:
  * - size clamped to the app's minimum (720x480);

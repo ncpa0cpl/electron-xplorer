@@ -87,6 +87,7 @@ edits show up here after a rebuild of the lib's `dist/`.
 | `yarn make:rpm`      | RPM (needs `rpmbuild` on the host)                                                                                      |
 | `yarn make:appimage` | Self-contained Linux `.AppImage` (host arch; `APPIMAGE_ARCH=arm64` to cross-package; fetches `appimagetool` if missing) |
 | `yarn make:macos`    | macOS `.zip` per arch — **on a Mac** for signable artifacts, or cross-packaged unsigned from Linux/CI                   |
+| `yarn make:dmg`      | macOS `.dmg` (host arch; **macOS host only** — needs `hdiutil`)                                                         |
 | `yarn icons`         | Re-renders `build/icons/*` from `build/icons/icon.svg` (PNG set + `.ico` + `.icns`)                                     |
 | `yarn lint`          | ESLint over all TypeScript                                                                                              |
 | `yarn test-platform` | Runs the platform self-test suite (see "Platform support" below)                                                        |
@@ -116,8 +117,15 @@ ELECTRON_XPLORER_DEVTOOLS=1 yarn start
   ICO/ICNS containers directly in pure JS. Linux makers consume the 512px
   PNG (`/usr/share/pixmaps/electron-xplorer.png`); `packagerConfig.icon`
   points at the `.icns` and the squirrel maker at the `.ico`.
-- **Makers** — squirrel (Windows), zip (macOS), deb and rpm (Linux) with
-  maintainer/categories/description/section metadata.
+- **Makers** — squirrel (Windows), zip and dmg (macOS), deb and rpm (Linux)
+  with maintainer/categories/description/section metadata.
+- **Packaged files** — Vite bundles everything except `sharp`, so the asar
+  holds only `.vite/` plus `sharp` and its installed dependencies (resolved
+  from `node_modules` at config load). `sharp` and `@img/*` are unpacked to
+  `app.asar.unpacked/` because the native addon loads libvips via a relative
+  rpath. Only the host's `@img/sharp-<os>-<arch>` binaries are installed by
+  default; building for another arch needs them installed too (see
+  https://sharp.pixelplumbing.com/install#cross-platform).
 
 ```sh
 yarn package              # → out/Electron Xplorer-linux-x64/
@@ -125,6 +133,7 @@ yarn make:deb             # → out/make/deb/x64/*.deb
 yarn make:rpm             # → out/make/rpm/x64/*.rpm   (needs rpmbuild)
 yarn make:appimage        # → out/make/appimage/electron-xplorer-x86_64.AppImage
 yarn make:macos           # → out/make/zip/darwin/<arch>/*.zip
+yarn make:dmg             # → out/make/Electron Xplorer-<version>-<arch>.dmg
 ```
 
 ### macOS distribution notes
@@ -138,15 +147,44 @@ codesign --deep --force --options runtime \
   "out/Electron Xplorer-darwin-arm64/Electron Xplorer.app"
 xcrun notarytool submit <zipped-app> --apple-id … --team-id … --password …
 xcrun stapler staple "Electron Xplorer.app"
-# Optional DMG (Forge 7 has no DMG maker):
-hdiutil create -volname "Electron Xplorer" -srcfolder "Electron Xplorer.app" \
-  -format UDZO Electron-Xplorer.dmg
 ```
+
+`yarn make:dmg` wraps the packaged app in a DMG, equally unsigned unless the
+app was signed first (e.g. via `packagerConfig.osxSign`).
 
 Building from Linux/CI is supported for testing only (Packager downloads the
 darwin Electron binaries); the resulting zip runs on machines with Gatekeeper
 exceptions. When the host lacks the `zip` CLI, the script transparently uses a
 7z-backed shim (`build/tools/bin/zip`).
+
+### Opening folders / default folder handler (macOS)
+
+The app runs as a single instance and opens every folder it is handed in a
+new tab: `electron-xplorer <dir>…` from a terminal, a second launch, or, on
+macOS, Launch Services (the bundle declares `public.folder` with
+`LSHandlerRank: Alternate`, so it shows up under Finder's "Open With" without
+taking over by default):
+
+```sh
+open -a "Electron Xplorer" ~/Documents
+```
+
+To make it the default for folders opened outside Finder (`open <dir>`, Dock
+stacks, other apps' "open folder" actions): macOS 26 rejects changing the
+`public.folder` handler through the Launch Services API (`duti -s …` and
+`NSWorkspace.setDefaultApplication` both fail with `-50`), so the override has
+to go straight into Launch Services' preferences, then log out and back in:
+
+```sh
+defaults export com.apple.LaunchServices/com.apple.launchservices.secure ~/launchservices-backup.plist
+defaults write com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers -array-add \
+  '{LSHandlerContentType="public.folder";LSHandlerRoleAll="com.ncpa0cpl.electron-xplorer";}'
+# back to Finder (also reverts any other handler changes made since the backup):
+defaults import com.apple.LaunchServices/com.apple.launchservices.secure ~/launchservices-backup.plist
+```
+
+Finder itself (Desktop, its own windows, Open/Save dialogs) is unaffected, and
+"Reveal in Finder" actions still go to Finder.
 
 ### Arch & derivatives
 
@@ -279,9 +317,11 @@ src/
 │   │                       process.platform switch, one impl per platform
 │   ├── drag-handlers.ts    "system:drag-out" → webContents.startDrag
 │   ├── menu-handlers.ts    native menu → "menu:command" broadcasts
+│   ├── launch-handlers.ts  folders from argv / second launch / macOS
+│   │                       `open-file` → "launch:*" (single instance)
 │   └── window-state.ts     bounds-only window persistence
 ├── preload/                contextBridge API (window.xplorer)
-│   ├── index.ts            merges fs/system/watch/media/menu/dnd namespaces
+│   ├── index.ts            merges fs/system/watch/media/menu/dnd/launch namespaces
 │   └── *-api.ts            one module per channel group
 ├── renderer/
 │   ├── index.ts            bootstrap entry
@@ -312,6 +352,8 @@ same UI could be driven by any other storage backend.
 - `media:*` — media streaming URLs and the shared thumbnail disk cache;
 - `fs:change` / `menu:command` — main→renderer pushes (directory watchers,
   native menu commands);
+- `launch:*` — folders to open: pulled once at startup (the first becomes the
+  initial tab instead of the home directory), later ones pushed as new tabs;
 - `system:drag-out` — fire-and-forget renderer→main drag session start
   (must run inside a `dragstart` user gesture).
 

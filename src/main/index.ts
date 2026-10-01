@@ -6,6 +6,7 @@ import {
   registerWindowEnterLeaveWatcher,
 } from "./drag-handlers";
 import { registerFsHandlers } from "./fs-handlers";
+import { registerLaunchHandlers } from "./launch-handlers";
 import { registerMediaHandlers } from "./media-handlers";
 import { registerXmediaScheme } from "./media-protocol";
 import { registerMenuHandlers } from "./menu-handlers";
@@ -13,13 +14,20 @@ import { getMainPlatform } from "./platform";
 import { registerSystemHandlers } from "./system-handlers";
 import { registerWatcherHandlers } from "./watcher-handlers";
 // Window state persistence - bounds ONLY (size/position/maximized; the last
-// visited directory is deliberately never persisted: the app always opens in
-// the home directory).
+// visited directory is deliberately never persisted: the app opens in the
+// home directory, or in the folder it was launched with).
 import { loadWindowState, trackWindowState } from "./window-state";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
+}
+
+// A second launch forwards its argv to this instance (`second-instance` in
+// launch-handlers.ts). `exit` rather than `quit`: before `ready` it ends the
+// process immediately, without creating a window.
+if (!app.requestSingleInstanceLock()) {
+  app.exit();
 }
 
 // Privileged scheme registration must happen before the app `ready` event.
@@ -91,6 +99,8 @@ const createWindow = () => {
     mainWindow.webContents.openDevTools();
   }
 };
+
+registerLaunchHandlers(createWindow);
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

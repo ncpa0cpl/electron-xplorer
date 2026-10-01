@@ -28,7 +28,12 @@ export function vanillaJsxResolveConfig(): Pick<
   return {
     build: {
       rollupOptions: {
-        external: ["ffmpeg-static", "ffprobe-static"],
+        external: [
+          "ffmpeg-static",
+          "ffprobe-static",
+          "sharp",
+          /^@img\/sharp-.*/,
+        ],
       },
     },
     resolve: {

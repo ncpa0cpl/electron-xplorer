@@ -5,6 +5,7 @@
  * booleans, typed arrays).
  */
 
+import type { LaunchApi } from "./launch-types";
 import type { MediaApi } from "./media-types";
 import type { MenuApi } from "./menu-types";
 import type { PlatformId } from "./platform/types";
@@ -127,7 +128,7 @@ export interface DndApi {
 }
 
 export interface XplorerApi
-  extends FsApi, SystemApi, WatchApi, MediaApi, DndApi, MenuApi
+  extends FsApi, SystemApi, WatchApi, MediaApi, DndApi, MenuApi, LaunchApi
 {}
 
 declare global {

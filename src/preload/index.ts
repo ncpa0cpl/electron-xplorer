@@ -1,6 +1,7 @@
 import { contextBridge } from "electron";
 import { dndApi } from "./dnd-api";
 import { fsApi } from "./fs-api";
+import { launchApi } from "./launch-api";
 import { mediaApi } from "./media-api";
 import { menuApi } from "./menu-api";
 import { systemApi } from "./system-api";
@@ -14,4 +15,5 @@ contextBridge.exposeInMainWorld("xplorer", {
   ...mediaApi,
   ...menuApi,
   ...dndApi,
+  ...launchApi,
 });
