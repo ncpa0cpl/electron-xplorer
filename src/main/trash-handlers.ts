@@ -19,8 +19,9 @@ import { clearTrashRecords } from "./trash-records";
  *    the sidecar ledger is cleared too: no trashed item exists anymore, so
  *    its records could never be matched again.
  *
- * After a successful restore/empty no fs watcher fires for the virtual
- * `trash:///` location - the renderer refreshes itself.
+ * After a successful restore/empty the trash storage dir watcher (watched
+ * while a trash tab is open) fires, and the renderer also refreshes itself
+ * for immediacy.
  */
 
 /** Registers all trash handlers. Call once during app startup. */

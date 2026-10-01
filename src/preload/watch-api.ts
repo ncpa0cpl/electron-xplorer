@@ -5,7 +5,8 @@ import type { FsChangeEvent, WatchApi } from "../shared/watch-types";
 /**
  * File-change watching bridge: subscribes to the "fs:change" channel that
  * main pushes on (see src/main/watcher-handlers.ts) and fans events out to
- * renderer-side subscribers.
+ * renderer-side subscribers. Also forwards the renderer-declared set of
+ * directories to watch ("watch:setDirs" channel).
  */
 
 const listeners = new Set<(event: FsChangeEvent) => void>();
@@ -42,5 +43,11 @@ export const watchApi: WatchApi = {
     return () => {
       listeners.delete(cb);
     };
+  },
+
+  setWatchedDirs(dirs) {
+    // Fire-and-forget: main validates and synchronizes its watcher registry
+    // to this set (see src/main/watcher-handlers.ts).
+    ipcRenderer.send("watch:setDirs", [...dirs]);
   },
 };

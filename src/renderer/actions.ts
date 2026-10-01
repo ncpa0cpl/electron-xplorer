@@ -245,7 +245,7 @@ async function runDeletePermanently(
   }
 
   // Match the lib's built-in delete behavior, which refreshes afterwards. The
-  // watcher integration also picks the change up; this just makes it instant.
+  // watcher also picks the change up; this just makes it instant.
   explorer.refresh();
 }
 
@@ -309,8 +309,8 @@ async function runRestoreTrash(
     );
   }
 
-  // No fs watcher covers the virtual trash location, so refresh explicitly
-  // (the lib's built-in delete-refresh behavior, mirrored here).
+  // A tab on the trash root watches the OS trash storage dirs, so the watcher
+  // normally picks the change up; this refresh just makes it instant.
   explorer.refresh();
 }
 
@@ -361,8 +361,8 @@ async function runEmptyTrash(explorer: Explorer): Promise<void> {
     explorer.open(TRASH_ROOT);
   }
 
-  // No fs watcher covers the virtual trash location, so refresh explicitly
-  // (same as the Restore action above).
+  // The watcher covers the trash storage dirs while a trash tab is open;
+  // this refresh just makes the result instant (same as Restore above).
   explorer.refresh();
 }
 

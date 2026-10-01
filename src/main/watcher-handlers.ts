@@ -1,4 +1,4 @@
-import { app, webContents } from "electron";
+import { app, ipcMain, webContents } from "electron";
 import fs from "node:fs";
 import type { FSWatcher } from "node:fs";
 import type { FsChangeEvent } from "../shared/watch-types";
@@ -6,44 +6,51 @@ import type { FsChangeEvent } from "../shared/watch-types";
 /**
  * Filesystem watcher service.
  *
- * Keeps one NON-recursive `fs.watch(dir)` subscription per browsed directory.
- * Directories enter the registry via `noteDirectoryAccessed`, which the
- * `fs:readdirStat` handler calls for every directory the renderer browses or
- * refreshes, so the set of watched dirs naturally tracks what the user is
- * actually looking at. Never uses `{ recursive: true }` (watching `/` or
- * `$HOME` recursively would cause an inotify storm).
+ * Keeps one NON-recursive `fs.watch(dir)` subscription per directory that is
+ * currently open in a renderer tab. The renderer declares WHICH dirs to watch
+ * via the `watch:setDirs` IPC message (fired by fs-explorer's
+ * `Filesystem.setWatchedDirs` whenever the set of open tab dirs changes; the
+ * renderer adapter maps virtual trash locations to their real OS trash
+ * storage dirs first). This service synchronizes its registry to that set:
+ * watchers for dirs that fell out of the set are closed, watchers for newly
+ * declared dirs are created. Never uses `{ recursive: true }` (watching `/`
+ * or `$HOME` recursively would cause an inotify storm).
  *
  * Registry properties:
- *  - LRU-capped at MAX_WATCHED_DIRS; the least-recently-used watcher is
- *    closed when the cap is exceeded.
+ *  - Capped at MAX_WATCHED_DIRS as a safety net; dirs beyond the cap are
+ *    skipped (and retried on a later sync that still declares them).
  *  - Events are debounced per directory (editors and write bursts fire many
  *    events) before being broadcast to the renderer.
  *  - Watcher errors (e.g. the directory was deleted) close and drop the
- *    watcher instead of crashing.
+ *    watcher instead of crashing; the dir is retried on the next sync.
  *  - Watchers are non-persistent (`persistent: false`) and timers are
  *    unref'd, so they never keep the event loop alive; a `will-quit` hook
  *    closes everything on shutdown.
  */
 
-const MAX_WATCHED_DIRS = 64;
+const MAX_WATCHED_DIRS = 256;
 const DEBOUNCE_MS = 200;
 
 interface WatcherEntry {
   watcher: FSWatcher;
   /** Pending coalescing broadcast timer for this directory, if any. */
   timer: NodeJS.Timeout | null;
-  /** Monotonic-ish recency stamp for LRU eviction. */
-  lastUsed: number;
 }
 
 const watchers = new Map<string, WatcherEntry>();
-let recencyCounter = 0;
 let quitHookInstalled = false;
 
 /** Registers the watcher service. Call once during app startup. */
 export function registerWatcherHandlers(): void {
   if (quitHookInstalled) return;
   quitHookInstalled = true;
+
+  // Renderer-declared watched set. Registered with raw `ipcMain.on`
+  // (fire-and-forget; the typed `handle` helper only validates path-string
+  // arguments), with the payload validated inline below.
+  ipcMain.on("watch:setDirs", (_event, dirs: unknown) => {
+    setWatchedDirs(validateDirs(dirs));
+  });
 
   // Clean shutdown: never let open watchers outlive the app.
   app.on("will-quit", () => {
@@ -52,22 +59,44 @@ export function registerWatcherHandlers(): void {
 }
 
 /**
- * "Note directory accessed" hook. Called by the `fs:readdirStat` handler for
- * every directory the renderer lists, which both seeds new watchers and
- * refreshes LRU recency for existing ones. Never throws; directories that
- * cannot be watched are silently skipped.
+ * Synchronizes the watcher registry to the renderer-declared set: closes
+ * watchers for dirs that are no longer declared, creates watchers for new
+ * ones. Never throws; directories that cannot be watched are silently
+ * skipped (and retried on the next sync that still declares them).
  */
-export function noteDirectoryAccessed(dir: string): void {
-  const existing = watchers.get(dir);
-  if (existing) {
-    existing.lastUsed = ++recencyCounter;
-    // Re-insert to keep Map iteration order = LRU order.
-    watchers.delete(dir);
-    watchers.set(dir, existing);
-    return;
+export function setWatchedDirs(dirs: readonly string[]): void {
+  const desired = new Set(dirs);
+
+  for (const dir of [...watchers.keys()]) {
+    if (!desired.has(dir)) {
+      dropWatcher(dir);
+    }
   }
 
-  void tryWatch(dir);
+  for (const dir of desired) {
+    if (watchers.has(dir)) continue;
+    if (watchers.size >= MAX_WATCHED_DIRS) {
+      console.warn(
+        `Watcher cap of ${MAX_WATCHED_DIRS} reached; not watching "${dir}".`,
+      );
+      continue;
+    }
+    void tryWatch(dir);
+  }
+}
+
+/**
+ * Validates the renderer-declared dir list: an array of non-empty strings
+ * without null bytes. Invalid entries are dropped rather than rejecting the
+ * whole sync — a stale watcher set is better than an exception mid-IPC.
+ */
+function validateDirs(arg: unknown): string[] {
+  if (!Array.isArray(arg)) return [];
+  return arg.filter(
+    (d): d is string =>
+      typeof d === "string" && d.length > 0
+      && !d.includes("\0"),
+  );
 }
 
 // ─── Internals ───────────────────────────────────────────────────────────────
@@ -78,11 +107,6 @@ async function tryWatch(dir: string): Promise<void> {
     const st = await fs.promises.stat(dir);
     if (!st.isDirectory()) return;
 
-    // Cap enforcement before creating a new watcher.
-    while (watchers.size >= MAX_WATCHED_DIRS) {
-      evictLeastRecentlyUsed();
-    }
-
     // Non-recursive watch of exactly this directory. `persistent: false`
     // means the watcher never keeps the process alive on its own.
     const watcher = fs.watch(dir, { persistent: false }, () => {
@@ -92,7 +116,8 @@ async function tryWatch(dir: string): Promise<void> {
     watcher.on("error", () => {
       // Directory deleted, permissions changed, EMFILE, ... — drop the
       // watcher and broadcast once so visible tabs can re-list (and fail
-      // gracefully if the dir is gone).
+      // gracefully if the dir is gone). A later `setWatchedDirs` that still
+      // declares the dir retries the watch.
       broadcast(dir);
       dropWatcher(dir);
     });
@@ -100,7 +125,7 @@ async function tryWatch(dir: string): Promise<void> {
       dropWatcher(dir);
     });
 
-    watchers.set(dir, { watcher, timer: null, lastUsed: ++recencyCounter });
+    watchers.set(dir, { watcher, timer: null });
   } catch {
     // fs.watch unavailable (unsupported platform) or stat failed — skip.
   }
@@ -110,8 +135,6 @@ async function tryWatch(dir: string): Promise<void> {
 function scheduleBroadcast(dir: string): void {
   const entry = watchers.get(dir);
   if (!entry) return;
-
-  entry.lastUsed = ++recencyCounter;
 
   if (entry.timer) clearTimeout(entry.timer);
   entry.timer = setTimeout(() => {
@@ -144,14 +167,6 @@ function dropWatcher(dir: string): void {
   } catch {
     // Already closed / errored.
   }
-}
-
-function evictLeastRecentlyUsed(): void {
-  // Map preserves insertion order; the first entry is the least recently
-  // touched (entries are re-inserted on access).
-  const oldest = watchers.keys().next();
-  if (oldest.done) return;
-  dropWatcher(oldest.value);
 }
 
 function closeAllWatchers(): void {

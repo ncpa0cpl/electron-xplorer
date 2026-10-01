@@ -219,6 +219,13 @@ export function createFilesystem(platform: Platform): Filesystem {
         trashEntriesByName.set(entry.name, entry);
         trashStorageDirs.add(platform.paths.dirname(entry.trashPath));
       }
+      // The watched set may reference trash storage dirs that only became
+      // known with this listing (e.g. a tab restored onto the trash root
+      // declares its dirs before the first listing resolves) — re-push so
+      // the storage dirs actually get watched.
+      if (lastWatchedDirs.some((dir) => isTrashPath(dir))) {
+        pushWatchedDirs();
+      }
       return entries;
     });
   }
@@ -408,16 +415,23 @@ export function createFilesystem(platform: Platform): Filesystem {
 
     // ─── File-change watching ────────────────────────────────────────────────
     //
-    // Main keeps one non-recursive `fs.watch` per browsed directory (seeded by
-    // the `fs:readdirStat` handler, so every dir a tab visits is watched) and
-    // pushes `fs:change` events over IPC. The lib registers one global
+    // The lib declares WHICH dirs to watch via `setWatchedDirs` (the dirs
+    // currently open in tabs, pushed on every tab open/close/navigation);
+    // main keeps one non-recursive `fs.watch` per declared dir and pushes
+    // `fs:change` events over IPC. The lib registers one global
     // `(dirPath?: string) => void` callback at startup (explorer.ts) and calls
     // `tab.refresh(dirPath)` on every tab; `dirPath` must equal the directory
     // path exactly as the tab browsed it — `history.findEntry` compares via
     // `Path.equals`, a normalized *segment-wise* comparison — so we forward
     // main's `dirPath` verbatim, EXCEPT for paths inside OS trash storage,
     // which are rewritten to the virtual path the tabs browsed. The callback
-    // set and bridge subscription live at module scope below.
+    // set and bridge subscription live at module scope below; the declared
+    // dir set is translated to real paths there too.
+
+    setWatchedDirs(dirs) {
+      lastWatchedDirs = dirs;
+      pushWatchedDirs();
+    },
 
     onChange(callback) {
       ensureBridgeSubscription();
@@ -463,6 +477,36 @@ export function createFilesystem(platform: Platform): Filesystem {
 // ─── File-change watching plumbing ───────────────────────────────────────────
 
 const changeCallbacks = new Set<(dirPath?: string) => void>();
+
+/** Last watched set declared by the lib (virtual trash paths included). */
+let lastWatchedDirs: readonly string[] = [];
+
+/**
+ * Forwards the lib-declared watched set to main over IPC. Virtual trash
+ * paths must be translated to real dirs first: a tab on the trash root
+ * watches every known OS trash storage dir, a tab inside a trashed item
+ * watches the real dir it browsed. Real paths pass through unchanged — they
+ * are exactly the strings tabs browsed, so main's change events (forwarded
+ * verbatim below) match tab history entries segment-wise.
+ */
+function pushWatchedDirs(): void {
+  const realDirs = new Set<string>();
+  for (const dir of lastWatchedDirs) {
+    if (isTrashRoot(dir)) {
+      for (const storageDir of trashStorageDirs) {
+        realDirs.add(storageDir);
+      }
+    } else if (isTrashPath(dir)) {
+      const real = resolveTrashPathOrNull(dir);
+      if (real !== null) {
+        realDirs.add(real);
+      }
+    } else {
+      realDirs.add(dir);
+    }
+  }
+  xplorer.setWatchedDirs([...realDirs]);
+}
 
 // Single bridge subscription, created lazily on first onChange registration;
 // it lives for the page lifetime (the lib itself registers one callback for

@@ -5,7 +5,6 @@ import path from "node:path";
 import type { DirEntry } from "../shared/fs-types";
 import { handle } from "./ipc";
 import { recordTrashedItem } from "./trash-records";
-import { noteDirectoryAccessed } from "./watcher-handlers";
 
 /**
  * Core filesystem IPC handlers ("fs:*" channels).
@@ -38,8 +37,6 @@ export function registerFsHandlers(): void {
  * instead of silently dropping it.
  */
 async function readdirStat(dir: string): Promise<DirEntry[]> {
-  // Seed/refresh a watcher for every directory the renderer browses.
-  noteDirectoryAccessed(dir);
   const dirents = await fs.readdir(dir, { withFileTypes: true });
 
   const settled = await Promise.allSettled(

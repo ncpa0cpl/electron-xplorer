@@ -17,9 +17,9 @@ export interface FsChangeEvent {
 
 /**
  * Watching API exposed over IPC. The main process keeps the actual
- * `fs.watch` subscriptions (one non-recursive watcher per browsed directory,
- * seeded by the `fs:readdirStat` hook); the renderer only receives pushed
- * events.
+ * `fs.watch` subscriptions; the renderer declares WHICH directories to watch
+ * (the dirs open in the app's tabs, pushed by fs-explorer's
+ * `Filesystem.setWatchedDirs`) and only receives pushed events back.
  */
 export interface WatchApi {
   /**
@@ -27,4 +27,11 @@ export interface WatchApi {
    * function.
    */
   onFsChange(cb: (event: FsChangeEvent) => void): () => void;
+  /**
+   * Declares the exact set of directories main should watch: the dirs
+   * currently open in the app's tabs (real native paths). Replaces the
+   * previous set wholesale on every call — watchers for dirs that fell out
+   * of the set are closed. Fire-and-forget ("watch:setDirs" channel).
+   */
+  setWatchedDirs(dirs: readonly string[]): void;
 }
