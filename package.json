@@ -12,6 +12,7 @@
   "main": ".vite/build/main.js",
   "scripts": {
     "start": "rm -rf node_modules/.vite && electron-forge start",
+    "start:dev": "rm -rf node_modules/.vite && ELECTRON_XPLORER_DEVTOOLS=1 electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",

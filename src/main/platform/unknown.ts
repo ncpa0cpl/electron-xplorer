@@ -1,14 +1,18 @@
 import os from "node:os";
 import path from "node:path";
-import type { PlaceInfo } from "../../shared/fs-types";
+import type { PlaceInfo, TrashRestoreItem } from "../../shared/fs-types";
 import type { MainPlatform, MenuAcceleratorKey } from "./types";
 
 /**
  * Degraded safe defaults for an unrecognized `process.platform`. Never
  * crashes, never guesses:
- *  - no terminal: `openInTerminal` rejects with a clear error,
+ *  - no terminal: `openInTerminal` rejects with a clear error (the
+ *    `XPLORER_TERMINAL` override is intentionally not honored here - there
+ *    is no platform to assume a shell/quoting convention for),
+ *  - no app chooser: `openWithDialog` rejects with a clear error,
  *  - places: the home directory only,
  *  - validation: POSIX-style (leading "/"),
+ *  - no trash support: empty listing, restore/empty reject,
  *  - Ctrl accelerators, no app menu.
  */
 
@@ -17,6 +21,33 @@ function openInTerminal(dir: string): Promise<void> {
     new Error(
       `Opening a terminal is not supported on this platform (dir: "${dir}").`,
     ),
+  );
+}
+
+function openWithDialog(p: string): Promise<void> {
+  return Promise.reject(
+    new Error(
+      `The native "Open With" dialog is not supported on this platform (file: "${p}").`,
+    ),
+  );
+}
+
+/** No trash layout is known for an unrecognized platform. */
+async function listTrash(): Promise<never[]> {
+  return [];
+}
+
+function restoreTrash(
+  _items: ReadonlyArray<TrashRestoreItem>,
+): Promise<void> {
+  return Promise.reject(
+    new Error("Restoring trash items is not supported on this platform."),
+  );
+}
+
+function emptyTrash(): Promise<void> {
+  return Promise.reject(
+    new Error("Emptying the trash is not supported on this platform."),
   );
 }
 
@@ -50,6 +81,7 @@ export function createUnknownMainPlatform(): MainPlatform {
     id: "unknown",
     getStaticPlaces,
     openInTerminal,
+    openWithDialog,
     isValidAbsolutePath: (p) => path.isAbsolute(p),
     protocolPathToAbsolute: (p) => {
       if (!path.isAbsolute(p)) {
@@ -60,5 +92,11 @@ export function createUnknownMainPlatform(): MainPlatform {
     accelerator,
     usesAppMenu: () => false,
     quitAfterAllWindowsClosed: () => true,
+    // Same as win32/linux: drop the native frame; the titlebar renders its
+    // own window-control buttons (right side).
+    titlebarWindowOptions: () => ({ frame: false }),
+    listTrash,
+    restoreTrash,
+    emptyTrash,
   };
 }

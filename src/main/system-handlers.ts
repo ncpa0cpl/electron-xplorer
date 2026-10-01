@@ -21,6 +21,7 @@ export function registerSystemHandlers(): void {
   handle("system:getStaticPlaces", [], getStaticPlaces);
   handle("system:openPath", ["path"], openPath);
   handle("system:openInTerminal", ["path"], openInTerminalHandler);
+  handle("system:openWith", ["path"], openWithHandler);
   /**
    * Returns the platform id the renderer needs to build its shared `Platform`
    * (src/shared/platform). Registered with raw `ipcMain.handle` (no argument,
@@ -71,6 +72,14 @@ async function openPath(p: string): Promise<void> {
 /** Opens a terminal emulator with the given directory as cwd (per platform). */
 async function openInTerminalHandler(p: string): Promise<void> {
   await getMainPlatform().openInTerminal(p);
+}
+
+/**
+ * Summons the OS-native "Open With" dialog for a file (per platform); user
+ * cancellation inside the dialog is not an error.
+ */
+async function openWithHandler(p: string): Promise<void> {
+  await getMainPlatform().openWithDialog(p);
 }
 
 /**

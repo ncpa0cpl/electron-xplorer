@@ -1,4 +1,5 @@
 import { Explorer, Immediate, Path } from "@ncpa0cpl/fs-explorer";
+import type { PlaceInfo } from "../shared/fs-types";
 import { createPlatform } from "../shared/platform/types";
 import {
   explorerActions,
@@ -10,6 +11,7 @@ import {
 import { nativeDragOutHandler } from "./drag-out";
 import { createFilesystem } from "./fs-adapter";
 import { initRendererPlatform } from "./platform";
+import { Titlebar } from "./titlebar";
 
 const dndApi = window.xplorer;
 
@@ -38,9 +40,18 @@ export async function bootstrap(): Promise<void> {
 
     // No `await` from here until `onOpenFolders` below: folder requests that
     // arrive in between would be dropped.
+
+    // The Trash is a purely virtual place: the `trash:///` root is served by
+    // the renderer fs adapter (fs:listTrash IPC), not by a real directory.
+    const trashPlace: PlaceInfo = {
+      id: "trash",
+      label: "Trash",
+      path: "trash:///",
+    };
+
     const explorer = new Explorer(filesystem, {
       initDir: launchFolder ?? homeDir,
-      staticPlaces,
+      staticPlaces: [...staticPlaces, trashPlace],
       // Double-click on a file opens it with the OS default application
       // (directories are handled by the lib itself: they navigate).
       openAction,
@@ -72,21 +83,23 @@ export async function bootstrap(): Promise<void> {
     setupMenuCommands(explorer, homeDir);
 
     document.body.classList.add("dark-theme");
-    document.body.appendChild(explorer.element());
 
-    // explorer.drag.isDragging().add((dragging) => {
-    //   if (dragging) {
-    //     dndApi.startCursorWatcher();
-    //   } else {
-    //     dndApi.stopCursorWatcher();
-    //   }
-    // });
+    // Layout shell: the integrated titlebar sits ABOVE the explorer in a
+    // flex column (see .app-shell/.explorer-host in src/index.css). The
+    // explorer element keeps its own internal scrolling - it is sized by the
+    // host (flex: 1, min-height: 0) and its stylesheet's height: 100% fills
+    // exactly that, so nothing needs to change in the lib's CSS.
+    const shell = document.createElement("div");
+    shell.className = "app-shell";
 
-    // dndApi.onCursorLeave(() => {
-    //   if (explorer.drag.isDragging().get()) {
-    //     explorer.drag.triggerPointerExit();
-    //   }
-    // });
+    shell.appendChild(Titlebar({ platformId }));
+
+    const explorerHost = document.createElement("div");
+    explorerHost.className = "explorer-host";
+    explorerHost.appendChild(explorer.element());
+
+    shell.appendChild(explorerHost);
+    document.body.appendChild(shell);
   } catch (err) {
     // Startup must not fail silently: log loudly and surface the error in the
     // window so failed IPC/bridge wiring is visible in screenshots too.

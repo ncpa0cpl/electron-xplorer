@@ -14,6 +14,7 @@ export const systemApi: SystemApi = {
   openPath: (p) => ipcRenderer.invoke("system:openPath", p) as Promise<void>,
   openInTerminal: (p) =>
     ipcRenderer.invoke("system:openInTerminal", p) as Promise<void>,
+  openWith: (p) => ipcRenderer.invoke("system:openWith", p) as Promise<void>,
   getPlatformInfo: () =>
     ipcRenderer.invoke("system:getPlatformInfo") as Promise<PlatformId>,
   // Registered on the "fs:trash" channel by src/main/fs-handlers.ts.

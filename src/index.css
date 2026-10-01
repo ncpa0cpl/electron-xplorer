@@ -1,7 +1,110 @@
+/* The app shell is an exact-viewport flex column; anything that would
+    overflow is handled by the components' own internal scrolling. */
+/* ─── App shell (integrated titlebar + explorer) ─────────────────────────── */
+/* Flex column filling the window: the custom titlebar on top, the explorer
+below it. Replaces the previous "explorer appended directly to body". */
+/* Host for the fs-explorer ExplorerWindow element: takes the space left by
+the titlebar. `min-height: 0` lets it shrink below its content height so the
+explorer's internal scroll areas keep working; `display: flex` makes the
+element's own `height: 100%` fill it exactly. */
+/* ─── Integrated titlebar (src/renderer/titlebar.ts) ────────────────────── */
+/* The whole bar drags the window; interactive children opt back out with
+`no-drag` (.titlebar-buttons). Height must match TITLEBAR_HEIGHT_PX in
+titlebar.ts (38). Background reuses the dark theme's second-level surface
+color so it blends with the explorer window below. */
+/* macOS: reserve space for the native traffic lights (top-left). */
+/* Window-control buttons: opt out of window dragging, native Windows/Linux
+conventions (wide square hover areas; close hover = red). */
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     Helvetica, Arial, sans-serif;
     margin: auto;
     width: 100vw;
     height: 100vh;
+    overflow: hidden;
+}
+
+.app-shell {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100vh;
+}
+
+.explorer-host {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+}
+
+.titlebar {
+    -webkit-app-region: drag;
+    flex: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: stretch;
+    height: 38px;
+    background: var(--clr-bg-3, #303030);
+    user-select: none;
+}
+
+.titlebar-macos .titlebar-title {
+    padding-left: 76px;
+}
+
+.titlebar-title {
+    align-self: center;
+    padding-left: 12px;
+    font-size: 13px;
+    color: var(--clr-text, #eee);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.titlebar-buttons {
+    -webkit-app-region: no-drag;
+    display: flex;
+}
+
+.titlebar-btn {
+    -webkit-app-region: no-drag;
+    width: 46px;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--clr-text, #eee);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+    outline: none;
+}
+
+.titlebar-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.titlebar-btn:active {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.titlebar-btn-close:hover,
+.titlebar-btn-close:active {
+    background: #e81123;
+    color: #fff;
+}
+
+.titlebar-btn svg {
+    width: 10px;
+    height: 10px;
+    display: block;
+}
+
+.titlebar-btn svg path {
+    stroke: currentColor;
+    stroke-width: 1;
+    fill: none;
 }

@@ -4,17 +4,19 @@ import type {
   ExplorerOptions,
   FileAction,
   FStat,
-  Path,
 } from "@ncpa0cpl/fs-explorer";
+import { Path } from "@ncpa0cpl/fs-explorer";
 import { createElement } from "@ncpa0cpl/vanilla-jsx";
 import type { ReadonlySignal } from "@ncpa0cpl/vanilla-jsx/signals";
 import { sig } from "@ncpa0cpl/vanilla-jsx/signals";
+import { resolveTrashPath, TRASH_ROOT } from "./fs-adapter";
 import { rendererPlatform } from "./platform";
 
 /**
  * Shell integration for the explorer: system-default file opening, custom
- * context-menu actions ("Open in Terminal", "Delete Permanently"), OS
- * drag-in support and window title synchronization.
+ * context-menu actions ("Open With…", "Open in Terminal", "Delete
+ * Permanently", "Restore" + "Empty Trash" for the trash), OS drag-in support
+ * and window title synchronization.
  *
  * Custom action error feedback uses `explorer.overlay.display` with a small
  * dismissible box (the lib's `actionError` signal is dispatched internally but
@@ -23,6 +25,27 @@ import { rendererPlatform } from "./platform";
 
 /** The live explorer instance; set once during bootstrap by `registerExplorer`. */
 let explorerRef: Explorer | undefined;
+
+// ─── Trash detection ─────────────────────────────────────────────────────────
+
+/**
+ * True for trash-derived entries: items listed in the virtual trash root and
+ * items browsed inside OS trash storage (e.g. within a trashed directory).
+ *
+ * The fs adapter tags ALL trash-derived FStats with the `trash` field
+ * (`originalPath` null when unknown) — this is the ONLY reliable detection.
+ * Trash item paths are REAL filesystem paths (e.g.
+ * `/home/u/.local/share/Trash/files/foo`), so `Path.isInside(TRASH_ROOT)`
+ * never matches them, and `basedir === TRASH_ROOT` only covers the top level.
+ */
+function isTrashItem(file: FStat): boolean {
+  return file.trash != null;
+}
+
+/** Trash detection that also covers the virtual trash root itself. */
+function isTrashLocation(file: FStat): boolean {
+  return file.path === TRASH_ROOT || isTrashItem(file);
+}
 
 /** Registers the explorer instance and starts window title synchronization. */
 export function registerExplorer(explorer: Explorer): void {
@@ -63,7 +86,8 @@ export const fileDropHandler: NonNullable<ExplorerOptions["fileDropHandler"]> =
 
 async function openWithSystemApp(file: FStat): Promise<void> {
   try {
-    await window.xplorer.openPath(file.path);
+    // Trash items carry virtual trash:// paths — resolve to the real path.
+    await window.xplorer.openPath(resolveTrashPath(file.path));
   } catch (err) {
     const msg = errorMessage(err);
     console.error(
@@ -85,8 +109,9 @@ const openTerminalAction: FileAction = {
   label: "Open in Terminal",
   // Single file or directory. For a file the terminal opens in its parent
   // directory. Also matches the current-directory background menu (where the
-  // lib passes the directory itself as the single "file").
-  match: (files) => files.length === 1,
+  // lib passes the directory itself as the single "file"). Never shown for
+  // trash locations: "restore first" is the only meaningful workflow there.
+  match: (files) => files.length === 1 && !isTrashLocation(files[0]!),
   run: (files) => {
     const file = files[0]!;
     const dir = file.directory
@@ -111,13 +136,50 @@ async function runOpenInTerminal(dir: string): Promise<void> {
   }
 }
 
+// ─── Open With… ──────────────────────────────────────────────────────────────
+
+const openWithAction: FileAction = {
+  label: "Open With…",
+  // Exactly one selected FILE. Not for directories (the OS "open with"
+  // dialog is file-only) and never for trash locations: OS trash storage is
+  // not a place to launch applications from ("restore first" is the only
+  // meaningful workflow there).
+  match: (files) =>
+    files.length === 1 && !files[0]!.directory && !isTrashLocation(files[0]!),
+  run: (files) => {
+    void runOpenWith(files[0]!);
+  },
+};
+
+async function runOpenWith(file: FStat): Promise<void> {
+  try {
+    // Trash items carry virtual trash:// paths — resolve to the real path.
+    await window.xplorer.openWith(resolveTrashPath(file.path));
+  } catch (err) {
+    const msg = errorMessage(err);
+    console.error(
+      `Failed to show the "Open With" dialog for "${file.path}":`,
+      err,
+    );
+    if (explorerRef) {
+      showActionError(
+        explorerRef,
+        `Could not open "Open With" for "${trimTo(file.name, 40)}": ${
+          trimTo(msg, 120)
+        }`,
+      );
+    }
+  }
+}
+
 // ─── Delete Permanently ──────────────────────────────────────────────────────
 
 const deletePermanentlyAction: FileAction = {
   label: "Delete Permanently",
   // Only shown when something is actually selected/right-clicked. (The lib's
   // `actionFilters` only gate its built-in menu entries, so visibility for
-  // custom actions is controlled here via `match`.)
+  // custom actions is controlled here via `match`.) Valid everywhere,
+  // including inside the trash, where it purges the stored item.
   match: (files, { isCurrentDir }) => files.length > 0 && !isCurrentDir,
   run: (files, explorer) => {
     void runDeletePermanently([...files], explorer);
@@ -147,7 +209,11 @@ async function runDeletePermanently(
   }
 
   const results = await Promise.allSettled(
-    files.map((file) => window.xplorer.removePermanent(file.path)),
+    files.map((file) =>
+      // Trash items carry virtual trash:// paths — resolve to the real path
+      // (deleting a trash item permanently purges it from trash storage).
+      window.xplorer.removePermanent(resolveTrashPath(file.path))
+    ),
   );
 
   const deleteFailures = results
@@ -183,8 +249,128 @@ async function runDeletePermanently(
   explorer.refresh();
 }
 
+// ─── Restore (trash items) ───────────────────────────────────────────────────
+
+const restoreTrashAction: FileAction = {
+  label: "Restore",
+  // Trash items only, single or multi selection. The fs adapter tags every
+  // trash-derived entry with FStat.trash (originalPath null when unknown —
+  // restore then fails with a clear per-item error from the main process).
+  match: (files) => files.length > 0 && files.every(isTrashItem),
+  run: (files, explorer) => {
+    void runRestoreTrash([...files], explorer);
+  },
+};
+
+async function runRestoreTrash(
+  files: readonly FStat[],
+  explorer: Explorer,
+): Promise<void> {
+  const items: { trashPath: string; originalPath: string }[] = [];
+  for (const file of files) {
+    const originalPath = file.trash?.originalPath;
+    if (originalPath == null) {
+      continue;
+    }
+    items.push({
+      // Trash items carry virtual trash:// paths — resolve to the real
+      // trashed item path the main process knows.
+      trashPath: resolveTrashPath(file.path),
+      originalPath,
+    });
+  }
+
+  if (items.length === 0) {
+    // The tag matches trash-derived entries with unknown origin too (e.g.
+    // items trashed outside this app on macOS/Windows, or nested entries of a
+    // trashed directory); restoring them is impossible by design.
+    showActionError(
+      explorer,
+      "The original location of the selected item(s) is unknown, so they cannot be restored.",
+    );
+    return;
+  }
+
+  // Items without a known original location are skipped by the filter above.
+  const skipped = files.length - items.length;
+
+  try {
+    await window.xplorer.restoreTrash(items);
+  } catch (err) {
+    const msg = errorMessage(err);
+    console.error("Failed to restore trash items:", err);
+    showActionError(explorer, `Could not restore: ${trimTo(msg, 120)}`);
+  }
+
+  if (skipped > 0) {
+    showActionError(
+      explorer,
+      `Restored ${items.length} of ${files.length} items; ${skipped} had an unknown original location and were left in the Trash.`,
+    );
+  }
+
+  // No fs watcher covers the virtual trash location, so refresh explicitly
+  // (the lib's built-in delete-refresh behavior, mirrored here).
+  explorer.refresh();
+}
+
+// ─── Empty Trash (trash root background) ─────────────────────────────────────
+
+const emptyTrashAction: FileAction = {
+  label: "Empty Trash",
+  // Available throughout the trash: the trash root's background menu (when
+  // nothing is selected the lib passes the current directory itself as the
+  // single "file") AND any trash item selection, wherever it is inside the
+  // trash. Regular directories must never match.
+  match: (files) => files.length > 0 && files.every(isTrashLocation),
+  run: (_files, explorer) => {
+    void runEmptyTrash(explorer);
+  },
+};
+
+async function runEmptyTrash(explorer: Explorer): Promise<void> {
+  let confirmed: { answer: boolean } | undefined;
+  try {
+    confirmed = await explorer.prompt.ask({
+      title: "Empty Trash",
+      message:
+        "This permanently deletes ALL items in the Trash and cannot be undone.",
+      confirmBtnLabel: "Empty",
+      cancelBtnLabel: "Cancel",
+    });
+  } catch {
+    // Prompt aborted (e.g. Escape) - treat as cancel.
+    return;
+  }
+  if (!confirmed?.answer) {
+    return;
+  }
+
+  try {
+    await window.xplorer.emptyTrash();
+  } catch (err) {
+    const msg = errorMessage(err);
+    console.error("Failed to empty the trash:", err);
+    showActionError(explorer, `Could not empty the trash: ${trimTo(msg, 120)}`);
+  }
+
+  // When triggered from inside a trashed directory, that directory no longer
+  // exists after the empty — return to the trash root view instead.
+  const currentPath = explorer.getCurrentDir().stat?.path;
+  if (currentPath !== undefined && currentPath !== TRASH_ROOT) {
+    explorer.open(TRASH_ROOT);
+  }
+
+  // No fs watcher covers the virtual trash location, so refresh explicitly
+  // (same as the Restore action above).
+  explorer.refresh();
+}
+
 /** Custom per-file/directory context-menu actions. */
 export const fileActions: readonly FileAction[] = [
+  restoreTrashAction,
+  emptyTrashAction,
+  openWithAction,
   openTerminalAction,
   deletePermanentlyAction,
 ];
@@ -209,6 +395,16 @@ async function handleOsFileDrop(
   dataTransfer: DataTransfer,
   dirStat: FStat,
 ): Promise<void> {
+  // Writing into the trash is not supported anywhere in the trash namespace
+  // (the trash root is read-only; restore is the only way out).
+  if (dirStat.path === TRASH_ROOT || dirStat.trash != null) {
+    console.error("Drag-in: dropping files into the Trash is not supported.");
+    if (explorerRef) {
+      showActionError(explorerRef, "Files cannot be dropped into the Trash.");
+    }
+    return;
+  }
+
   const dropped = Array.from(dataTransfer.files ?? []);
   if (dropped.length === 0) {
     return;

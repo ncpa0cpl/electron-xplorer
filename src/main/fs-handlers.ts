@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { DirEntry } from "../shared/fs-types";
 import { handle } from "./ipc";
+import { recordTrashedItem } from "./trash-records";
 import { noteDirectoryAccessed } from "./watcher-handlers";
 
 /**
@@ -165,9 +166,14 @@ async function readFile(p: string): Promise<Uint8Array> {
   return await fs.readFile(p);
 }
 
-/** Moves a path to the OS trash. */
+/**
+ * Moves a path to the OS trash. On success a sidecar record (see
+ * src/main/trash-records.ts) is appended so the trash view knows the item's
+ * original location even on platforms whose trash metadata doesn't record it.
+ */
 async function trash(p: string): Promise<void> {
   await shell.trashItem(p);
+  await recordTrashedItem(p);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

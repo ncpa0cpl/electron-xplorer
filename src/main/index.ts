@@ -12,10 +12,15 @@ import { registerXmediaScheme } from "./media-protocol";
 import { registerMenuHandlers } from "./menu-handlers";
 import { getMainPlatform } from "./platform";
 import { registerSystemHandlers } from "./system-handlers";
+import { registerTrashHandlers } from "./trash-handlers";
 import { registerWatcherHandlers } from "./watcher-handlers";
 // Window state persistence - bounds ONLY (size/position/maximized; the last
 // visited directory is deliberately never persisted: the app opens in the
 // home directory, or in the folder it was launched with).
+import {
+  registerWindowHandlers,
+  trackWindowMaximizedState,
+} from "./window-handlers";
 import { loadWindowState, trackWindowState } from "./window-state";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -36,10 +41,12 @@ registerXmediaScheme();
 // Register every IPC handler before any window exists.
 registerFsHandlers();
 registerSystemHandlers();
+registerTrashHandlers();
 registerWatcherHandlers();
 registerMediaHandlers();
 registerMenuHandlers();
 registerDragHandlers();
+registerWindowHandlers();
 
 const createWindow = () => {
   // Restore previously persisted window bounds (size clamped to the minimum,
@@ -59,6 +66,13 @@ const createWindow = () => {
     show: false,
     // Dark background to avoid a white flash before the renderer paints.
     backgroundColor: "#1e1e1e",
+    // Custom integrated titlebar (src/renderer/titlebar.ts) replacing the
+    // native one: on macOS keep the native traffic lights at their default
+    // top-left position (only the native title bar is hidden); on every other
+    // platform drop the native frame entirely - the renderer titlebar draws
+    // its own window-control buttons on the right. Per-platform options come
+    // from the main platform bridge (one-switch rule).
+    ...getMainPlatform().titlebarWindowOptions(),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -67,9 +81,18 @@ const createWindow = () => {
     },
   });
 
+  // Keep the auto-hidden menu bar: with `frame: false` a non-auto-hidden
+  // application menu is always rendered INSIDE the window (below the custom
+  // titlebar area), stealing vertical space; hidden, it still reveals on Alt
+  // and all of its accelerators keep working.
   mainWindow.setAutoHideMenuBar(true);
 
   registerWindowEnterLeaveWatcher(mainWindow);
+
+  // Push maximize/unmaximize state to the renderer titlebar
+  // ("window:maximizedChanged" channel). Attached right after creation so no
+  // state change is missed.
+  trackWindowMaximizedState(mainWindow);
 
   // Persist window bounds ONLY: debounced on resize/move, synchronous on
   // close. Must be attached right after creation so no change is missed.

@@ -15,11 +15,20 @@ Forge + Vite) and the
   thumbnail gallery; per-tab view state.
 - **File operations** — new folder/file, rename (single + bulk rename
   overlay), copy/cut/paste with overwrite prompting, delete **to the OS
-  trash** (permanent delete available from the context menu).
+  trash** (permanent delete available from the context menu). The trash is
+  browsable at the virtual `trash:///` place, with "Restore" per item and an
+  "Empty Trash" action on the trash root (asks first; **permanently deletes
+  ALL items**).
 - **Shell integration** — double-click opens a file with the OS default
-  application; "Open in Terminal" (with `$TERMINAL` support and per-terminal
-  argument conventions); a left **places pane** (Home, Desktop, Documents,
-  Downloads, Music, Pictures, Videos, Filesystem root).
+  application; "Open With…" brings up the OS-native application-chooser
+  dialog for a file (xdg-desktop-portal `OpenFile` with `ask` via a
+  python3/GLib helper on Linux, `rundll32 shell32.dll,OpenAs_RunDLLW` on
+  Windows, AppleScript `choose application` on macOS); "Open in Terminal"
+  (with `$TERMINAL` support, per-terminal argument conventions, and a
+  custom `$XPLORER_TERMINAL` command-line override — see "Open in Terminal"
+  below); a left
+  **places pane** (Home, Desktop, Documents, Downloads, Music, Pictures,
+  Videos, Filesystem root).
 - **Live filesystem watching** — every browsed directory gets one
   non-recursive `fs.watch` subscription in the main process; change events
   are debounced, LRU-capped (64 dirs) and pushed to the renderer, so tabs
@@ -40,6 +49,52 @@ Forge + Vite) and the
 - **Window bounds persistence** — size/position/maximized state restored
   across restarts (`userData/window-state.json`); deliberately never
   persists the last visited directory (the app always opens in `$HOME`).
+
+## Open in Terminal
+
+"Open in Terminal" spawns a terminal emulator in the browsed directory.
+Built-in detection (first match wins):
+
+- **Linux** — `$TERMINAL` when it names an executable (a bare binary;
+  spawned directly, no shell, with the directory flag of known emulators),
+  then a detection table: `gnome-terminal`, `konsole`, `xfce4-terminal`,
+  `x-terminal-emulator`, `alacritty`, `kitty`, `tilix`, `foot`.
+- **macOS** — `open -a iTerm <dir>` when iTerm is installed, else
+  `open -a Terminal <dir>`.
+- **Windows** — `wt.exe -d <dir>`, then `powershell.exe`, then `cmd.exe`.
+
+### `XPLORER_TERMINAL` — custom terminal override
+
+Setting the **`XPLORER_TERMINAL`** environment variable overrides _all_ of
+the above on _every_ platform (including Linux `$TERMINAL`). The value is a
+**full command line template** that the app runs through the system shell
+(`/bin/sh` on Linux/macOS, `cmd.exe` on Windows):
+
+- If the value contains the `{dir}` placeholder, **every** occurrence is
+  replaced with the target directory, shell-quoted for the platform
+  (POSIX single-quote escaping; Windows double-quote escaping).
+- If the value contains **no** `{dir}` placeholder, the quoted directory is
+  appended as the final argument.
+
+Examples:
+
+```sh
+# Linux / macOS
+XPLORER_TERMINAL='wezterm start --cwd {dir}' electron-xplorer
+XPLORER_TERMINAL='kitty --directory {dir}' electron-xplorer
+XPLORER_TERMINAL='alacritty --working-directory' electron-xplorer  # {dir} appended
+```
+
+```powershell
+# Windows (PowerShell)
+$env:XPLORER_TERMINAL = 'wt -d {dir}'
+$env:XPLORER_TERMINAL = '"C:\Program Files\WezTerm\wezterm-gui.exe" start --cwd {dir}'
+```
+
+Note the difference to Linux `$TERMINAL`: that variable holds a **single
+binary name** and is spawned directly without a shell, while
+`XPLORER_TERMINAL` is a **whole command line** evaluated by the shell — and
+it wins over `$TERMINAL` and every built-in detection path.
 
 ## Development setup
 
@@ -225,6 +280,7 @@ artifact also works on Arch directly, no packaging required.
 | Static places (left pane)                                  | ✓ tested | ✓ implemented                            | ✓ implemented |
 | Menu accelerators / app menu                               | ✓ tested | ✓ implemented                            | ✓ implemented |
 | Hidden-file semantics                                      | ✓ tested | ✓ implemented (name-based approximation) | ✓ implemented |
+| Trash (browse + restore + empty)                           | ✓ tested | ✓ best-effort                            | ✓ best-effort |
 
 Honest caveat: this project is developed on **Linux**. Linux is exercised
 continuously (including the automated screenshot/interaction runs). The
@@ -267,8 +323,9 @@ Two layers:
    process-level behavior: static places, terminal spawning, absolute-path
    validation for IPC/protocol/drag arguments, `xmedia://` URL path
    decoding, menu accelerators (`Ctrl` vs `CmdOrCtrl`), the macOS app-menu
-   flag and the quit-when-last-window-closes policy. Terminal order:
-   `$TERMINAL` + the usual Linux emulators; `open -a iTerm/Terminal` on
+   flag and the quit-when-last-window-closes policy. Terminal order: an
+   `$XPLORER_TERMINAL` command-line override when set, then `$TERMINAL` +
+   the usual Linux emulators; `open -a iTerm/Terminal` on
    macOS; `wt.exe` → `powershell.exe` → `cmd.exe` on Windows (quoting
    choices documented in `src/main/platform/win32.ts`).
 

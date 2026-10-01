@@ -91,6 +91,12 @@ export interface SystemApi {
   /** Opens a terminal emulator with the given directory as cwd. */
   openInTerminal(path: string): Promise<void>;
   /**
+   * Summons the OS-native "choose application" ("Open With") dialog for a
+   * file. Resolution is left entirely to the OS; user cancellation inside
+   * the dialog is not an error.
+   */
+  openWith(path: string): Promise<void>;
+  /**
    * The running platform's id, used by the renderer to build its shared
    * `Platform` implementation (src/shared/platform). The ONLY channel over
    * which platform identity crosses the process boundary - the renderer
@@ -127,8 +133,80 @@ export interface DndApi {
   onCursorLeave(cb: () => void): () => void;
 }
 
+/**
+ * One OS-trash entry as returned by the `fs:listTrash` handler.
+ *
+ * `trashPath` is always a real absolute path of the trashed item (on Linux the
+ * FreeDesktop `files/` entry, on Windows the `$Recycle.Bin/$R...` path
+ * reported by the shell) so existing operations (open, permanent delete,
+ * copy-out) work on it unchanged. `originalPath` is `null` when the OS or the
+ * app's sidecar records cannot tell where the item came from.
+ */
+export interface TrashEntryInfo {
+  readonly name: string;
+  readonly trashPath: string;
+  readonly originalPath: string | null;
+  /** Unix epoch ms, or `null` when unknown. */
+  readonly deletionTime: number | null;
+  readonly isDirectory: boolean;
+  readonly size: number;
+  readonly mtimeMs: number;
+}
+
+/** One item to move back out of the trash (see `fs:restoreTrash`). */
+export interface TrashRestoreItem {
+  readonly trashPath: string;
+  readonly originalPath: string;
+}
+
+/**
+ * Trash operations exposed over IPC ("fs:*" channels, see
+ * src/main/trash-handlers.ts).
+ */
+export interface TrashApi {
+  /** Lists the OS trash contents. */
+  listTrash(): Promise<TrashEntryInfo[]>;
+  /** Restores trashed items to their original locations. */
+  restoreTrash(items: TrashRestoreItem[]): Promise<void>;
+  /**
+   * Permanently deletes ALL trash contents. Unrecoverable — the renderer must
+   * ask for confirmation before invoking (see actions.ts "Empty Trash").
+   */
+  emptyTrash(): Promise<void>;
+}
+
+/**
+ * Window-control operations exposed over IPC ("window:*" channels, see
+ * src/main/window-handlers.ts). Backs the custom integrated titlebar
+ * (src/renderer/titlebar.ts).
+ */
+export interface WindowApi {
+  /** Minimizes the window that hosts the calling renderer. */
+  minimize(): Promise<void>;
+  /** Maximizes the window, or restores it if it is already maximized. */
+  maximizeOrRestore(): Promise<void>;
+  /** Closes the window that hosts the calling renderer. */
+  close(): Promise<void>;
+  /** `true` while the window is maximized (initial state, see below). */
+  isMaximized(): Promise<boolean>;
+  /**
+   * Subscribes to maximized-state changes pushed from main
+   * ("window:maximizedChanged"). Returns an unsubscribe function.
+   */
+  onMaximizedChanged(cb: (maximized: boolean) => void): () => void;
+}
+
 export interface XplorerApi
-  extends FsApi, SystemApi, WatchApi, MediaApi, DndApi, MenuApi, LaunchApi
+  extends
+    FsApi,
+    SystemApi,
+    TrashApi,
+    WatchApi,
+    MediaApi,
+    DndApi,
+    MenuApi,
+    LaunchApi,
+    WindowApi
 {}
 
 declare global {
