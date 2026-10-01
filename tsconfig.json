@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "commonjs",
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    // Full strict mode: strictNullChecks, noImplicitAny, strictFunctionTypes,
+    // etc. The renderer narrows fs-explorer's `any`-typed controller fields
+    // (explorer.location/directory/history, see src/renderer/app.ts) with
+    // explicit, commented casts instead of weakening these flags.
+    "strict": true,
+  },
+  "exclude": ["node_modules", ".vite", "out", "dist", "scripts"],
+}

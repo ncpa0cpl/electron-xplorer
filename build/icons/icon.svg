@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  Electron Xplorer application icon (source vector).
+
+  Design notes:
+  - Squircle app tile with a near-flat dark background (#262b33) so the icon
+    sits naturally on both dark and light desktops (dark-theme friendly).
+  - Neutral two-tone folder glyph: muted steel-blue body with a lighter tab
+    edge; a small white "explore" caret inside the front face keeps the glyph
+    readable down to 16x16 without text.
+  - No gradients beyond a very subtle vertical shade on the tile.
+-->
+
+<svg
+   width="512"
+   height="512"
+   viewBox="0 0 512 512"
+   version="1.1"
+   id="svg5"
+   sodipodi:docname="icon.svg"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview5"
+     pagecolor="#505050"
+     bordercolor="#ffffff"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="1"
+     inkscape:deskcolor="#505050"
+     inkscape:zoom="1.1660156"
+     inkscape:cx="24.871022"
+     inkscape:cy="327.61139"
+     inkscape:window-width="2504"
+     inkscape:window-height="1403"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg5" />
+  <defs
+     id="defs2">
+    <linearGradient
+       id="tile"
+       x1="0"
+       y1="0"
+       x2="0"
+       y2="1">
+      <stop
+         offset="0"
+         stop-color="#2c313b"
+         id="stop1" />
+      <stop
+         offset="1"
+         stop-color="#20242c"
+         id="stop2" />
+    </linearGradient>
+  </defs>
+  <!-- App tile: squircle-ish rounded square with a thin edge highlight -->
+  <rect
+     x="24"
+     y="24"
+     width="464"
+     height="464"
+     rx="104"
+     ry="104"
+     fill="url(#tile)"
+     id="rect2" />
+  <rect
+     x="24"
+     y="24"
+     width="464"
+     height="464"
+     rx="104"
+     ry="104"
+     fill="none"
+     stroke="#3b4250"
+     stroke-width="6"
+     id="rect3" />
+  <g
+     transform="translate(256 256)"
+     id="g5">
+    <!-- Folder back + tab (darker tone) -->
+    <path
+       d="M -148 -92          H -52          L -20 -60          H 148          A 24 24 0 0 1 172 -36          V 128          A 24 24 0 0 1 148 152          H -148          A 24 24 0 0 1 -172 128          V -68          A 24 24 0 0 1 -148 -92          Z"
+       fill="#4a5568"
+       id="path3" />
+    <!-- Folder front face (lighter tone) -->
+    <path
+       d="M -172 -28          H 172          V 128          A 24 24 0 0 1 148 152          H -148          A 24 24 0 0 1 -172 128          Z"
+       fill="#7b8ba5"
+       id="path4" />
+    <!-- "Explore" caret: points outward, like a file being browsed -->
+    <path
+       d="M 88.011861,16.273199 -86.272893,16.239693"
+       fill="none"
+       stroke="#e8edf5"
+       stroke-width="26"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       id="path5"
+       sodipodi:nodetypes="cc" />
+  </g>
+</svg>
