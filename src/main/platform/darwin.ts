@@ -94,10 +94,11 @@ function appleScriptEscape(value: string): string {
  * message - treated as a no-op success, not an error.
  */
 async function openWithDialog(p: string): Promise<void> {
+  // `as alias` is required: on an application reference `POSIX path of` fails (-1728).
   const script =
     `POSIX path of (choose application with prompt "Choose an application to open \\"${
       appleScriptEscape(path.basename(p))
-    }\\"")`;
+    }\\"" as alias)`;
 
   let appPath: string;
   try {

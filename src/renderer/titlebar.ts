@@ -34,10 +34,10 @@ import type { PlatformId } from "../shared/platform/types";
  */
 
 /** Left padding reserving space for the native macOS traffic lights. */
-const MACOS_TRAFFIC_LIGHTS_PADDING = "76px";
+const MACOS_TRAFFIC_LIGHTS_PADDING = "80px";
 
 /** Bar height - must match `.titlebar` height in src/index.css. */
-export const TITLEBAR_HEIGHT_PX = 38;
+export const TITLEBAR_HEIGHT_PX = 32;
 
 export interface TitlebarProps {
   /**

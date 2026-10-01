@@ -43,13 +43,13 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: stretch;
-    height: 38px;
+    height: 32px;
     background: var(--clr-bg-3, #303030);
     user-select: none;
 }
 
 .titlebar-macos .titlebar-title {
-    padding-left: 76px;
+    padding-left: 80px;
 }
 
 .titlebar-title {
