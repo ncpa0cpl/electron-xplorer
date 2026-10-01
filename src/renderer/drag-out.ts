@@ -1,4 +1,4 @@
-import type { FStat } from "fs-explorer";
+import type { FStat } from "@ncpa0cpl/fs-explorer";
 import { rendererPlatform } from "./platform";
 
 /**

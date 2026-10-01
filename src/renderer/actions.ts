@@ -1,6 +1,3 @@
-import { createElement } from "@ncpa0cpl/vanilla-jsx";
-import type { ReadonlySignal } from "@ncpa0cpl/vanilla-jsx/signals";
-import { sig } from "@ncpa0cpl/vanilla-jsx/signals";
 import type {
   Explorer,
   ExplorerAction,
@@ -8,7 +5,10 @@ import type {
   FileAction,
   FStat,
   Path,
-} from "fs-explorer";
+} from "@ncpa0cpl/fs-explorer";
+import { createElement } from "@ncpa0cpl/vanilla-jsx";
+import type { ReadonlySignal } from "@ncpa0cpl/vanilla-jsx/signals";
+import { sig } from "@ncpa0cpl/vanilla-jsx/signals";
 import { rendererPlatform } from "./platform";
 
 /**
@@ -118,7 +118,7 @@ const deletePermanentlyAction: FileAction = {
   // Only shown when something is actually selected/right-clicked. (The lib's
   // `actionFilters` only gate its built-in menu entries, so visibility for
   // custom actions is controlled here via `match`.)
-  match: (files) => files.length > 0,
+  match: (files, { isCurrentDir }) => files.length > 0 && !isCurrentDir,
   run: (files, explorer) => {
     void runDeletePermanently([...files], explorer);
   },

@@ -1,5 +1,4 @@
-import { Explorer, Immediate, Path } from "fs-explorer";
-import type { FStat } from "fs-explorer";
+import { Explorer, Immediate, Path } from "@ncpa0cpl/fs-explorer";
 import { createPlatform } from "../shared/platform/types";
 import {
   explorerActions,
@@ -124,16 +123,14 @@ function isTextEditing(): boolean {
  * own components (context menu, location bar, left pane).
  */
 function setupMenuCommands(explorer: Explorer, homeDir: string): void {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const activeHistory = (): any => explorer.history.get();
+  const activeHistory = () => explorer.history.get();
 
   window.xplorer.onMenuCommand((command) => {
     switch (command) {
       case "new-tab": {
         // Mirror the lib's own "+" button: open the new tab at the active
         // tab's current location.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        explorer.newTab((explorer.location as any).get().path);
+        explorer.newTab(explorer.location.get().path);
         break;
       }
       case "close-tab": {
@@ -164,8 +161,7 @@ function setupMenuCommands(explorer: Explorer, homeDir: string): void {
         // The lib's location bar "up" is `history.backPush()` (navigates to
         // the parent directory). Skip at the filesystem root, where the
         // parent equals the current path.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const current = (explorer.location as any).get().path;
+        const current = explorer.location.get().path;
         const parent = Path.from(current).dir();
         if (!parent.equals(current)) {
           activeHistory().backPush();
@@ -182,8 +178,7 @@ function setupMenuCommands(explorer: Explorer, homeDir: string): void {
           break;
         }
         // Same lookup the lib's own Ctrl+C/X handler performs.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const files = (explorer.directory as any).get().getActionableFiles();
+        const files = explorer.directory.get().getActionableFiles();
         if (files) {
           explorer.clipboard.put(files, command === "copy" ? "copy" : "move");
         }
@@ -194,16 +189,14 @@ function setupMenuCommands(explorer: Explorer, homeDir: string): void {
           break;
         }
         // Same lookup the lib's own Ctrl+V handler performs.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const dstat = (explorer.directory as any).get().stat.get();
+        const dstat = explorer.directory.get().stat.get();
         if (dstat && dstat.write) {
           explorer.fs.clipboardPaste(dstat.path);
         }
         break;
       }
       case "select-all": {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (explorer.directory as any).get().selectAll();
+        explorer.directory.get().selectAll();
         break;
       }
       case "delete": {
@@ -212,8 +205,8 @@ function setupMenuCommands(explorer: Explorer, homeDir: string): void {
         }
         // Mirror the lib's own plain-Delete handler: trash the actionable
         // files (Filesystem.remove maps to the OS trash), then refresh.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const files: readonly FStat[] = (explorer.directory as any)
+
+        const files = explorer.directory
           .get()
           .getActionableFiles();
         if (files) {
@@ -230,8 +223,7 @@ function setupMenuCommands(explorer: Explorer, homeDir: string): void {
         // Mirror the lib's F2 handler for a single file. The lib's
         // multi-selection bulk-rename overlay is not part of its public
         // exports, so the menu item intentionally does nothing there.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const files = (explorer.directory as any).get().getActionableFiles();
+        const files = explorer.directory.get().getActionableFiles();
         if (files && files.length === 1) {
           const file = files[0];
           explorer.prompt
@@ -255,8 +247,7 @@ function setupMenuCommands(explorer: Explorer, homeDir: string): void {
         // Public toggle on the active tab's DirViewController (same method
         // the lib's left-pane "Show hidden files" switch calls). Per-tab:
         // each tab tracks its own visibility flag.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (explorer.directory as any).get().showHiddenFilesToggle();
+        explorer.directory.get().showHiddenFilesToggle();
         break;
       }
       default: {

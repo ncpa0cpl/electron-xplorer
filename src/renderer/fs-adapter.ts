@@ -1,4 +1,4 @@
-import { type Filesystem, type FStat } from "fs-explorer";
+import { type Filesystem, type FStat } from "@ncpa0cpl/fs-explorer";
 import { lookup } from "mrmime";
 import type { DirEntry } from "../shared/fs-types";
 import type { Platform } from "../shared/platform/types";

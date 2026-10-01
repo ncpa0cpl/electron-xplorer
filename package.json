@@ -28,6 +28,7 @@
     "@ncpa0cpl/vanilla-jsx": "^0.0.1-alpha.52"
   },
   "dependencies": {
+    "@ncpa0cpl/fs-explorer": "^1.0.0",
     "@ncpa0cpl/vanilla-jsx": "^0.0.1-alpha.52",
     "adwavecss": "^0.2.6",
     "adwaveui": "^0.3.2",
