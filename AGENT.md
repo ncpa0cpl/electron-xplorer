@@ -1,6 +1,6 @@
 # AGENT.md — electron-xplorer
 
-Electron 42 file explorer app ("Electron Xplorer"): tabbed browsing, preview pane, thumbnails, context menus, OS drag-and-drop, trash, terminals. Built with electron-forge + Vite; renderer UI written with `@ncpa0cpl/vanilla-jsx` hyperscript and styled with adwavecss/adwaveui + `src/index.css`.
+Electron 44 file explorer app ("Electron Xplorer"): tabbed browsing, preview pane, thumbnails, context menus, OS drag-and-drop, trash, terminals. Built with electron-forge + Vite; renderer UI written with `@ncpa0cpl/vanilla-jsx` hyperscript and styled with adwavecss/adwaveui + `src/index.css`.
 
 The explorer UI itself comes from the sibling library `@ncpa0cpl/fs-explorer`.
 
@@ -17,7 +17,7 @@ yarn test-platform  # scripts/test-platform.mjs — platform-module smoke test
 
 ## Process architecture
 
-Three Vite bundles (`vite.main.config.ts`, `vite.preload.config.ts`, `vite.renderer.config.ts`; shared resolve helpers in `vite.shared.ts`):
+Three Vite bundles (`vite.main.config.mts`, `vite.preload.config.mts`, `vite.renderer.config.mts`; shared resolve helpers in `vite.shared.mts`):
 
 - **Main** — `src/main.ts` → `src/main/index.ts`. Window creation, app lifecycle, all `ipcMain` handlers, menu bar, file watching, thumbnails, platform OS integration. Forge config: `forge.config.ts` (asar, Makers for win/mac/linux, VitePlugin, fuses).
 - **Preload** — `src/preload.ts` → `src/preload/index.ts`. `contextIsolation: true`, `nodeIntegration: false`, `sandbox: false`. Merges per-domain API modules into `window.xplorer`.

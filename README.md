@@ -1,6 +1,6 @@
 # Electron Xplorer
 
-A cross-platform, tabbed **file explorer** built on **Electron 42** (Electron
+A cross-platform, tabbed **file explorer** built on **Electron 44** (Electron
 Forge + Vite) and the
 [fs-explorer](https://github.com/ncpa0cpl/fs-explorer) UI library
 (`@ncpa0cpl` / Szymon Bretner).
@@ -358,8 +358,8 @@ Two layers:
 
 ```
 src/
-├── main.ts                 thin entry (bundle basename → .vite/build/main.js)
-├── preload.ts              thin entry (→ .vite/build/preload.js)
+├── main.ts                 thin entry (bundle basename → .vite/build/main.cjs)
+├── preload.ts              thin entry (→ .vite/build/preload.cjs)
 ├── main/                   main process
 │   ├── index.ts            app lifecycle, window creation, devtools opt-in
 │   ├── ipc.ts              typed `ipcMain.handle` wrapper w/ arg validation

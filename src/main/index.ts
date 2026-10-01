@@ -74,7 +74,7 @@ const createWindow = () => {
     // from the main platform bridge (one-switch rule).
     ...getMainPlatform().titlebarWindowOptions(),
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,

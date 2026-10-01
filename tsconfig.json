@@ -2,6 +2,12 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "commonjs",
+    // Vite config files are .mts (ESM, per Forge 8's Vite plugin), so they
+    // import vite.shared.mts with an explicit extension. tsc is only ever run
+    // with --noEmit here (bundles are produced by Vite/Rollup), which is what
+    // allows these extensioned imports.
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
