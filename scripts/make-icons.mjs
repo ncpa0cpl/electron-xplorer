@@ -25,6 +25,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import sharp from "sharp";
 
 const iconsDir = path.resolve(import.meta.dirname, "..", "build", "icons");
 const svgPath = path.join(iconsDir, "icon.svg");
@@ -33,26 +34,23 @@ const SIZES = [16, 32, 64, 128, 256, 512];
 
 // ─── PNG rendering ───────────────────────────────────────────────────────────
 
-function renderPng(size) {
+async function renderPng(size) {
   const out = path.join(iconsDir, `${size}x${size}.png`);
   try {
-    execFileSync("rsvg-convert", [
-      "-w",
-      String(size),
-      "-h",
-      String(size),
-      svgPath,
-      "-o",
-      out,
-    ]);
+    await sharp(svgPath, { density: (72 * size) / 512 })
+      .resize(size, size)
+      .png()
+      .toFile(out);
   } catch {
     // Fallback: ImageMagick. `-background none` keeps SVG transparency.
-    execFileSync("convert", [
+    execFileSync("magick", [
+      "-background",
+      "none",
+      "-density",
+      String(Math.ceil(72 * size / 512)), // render at target size, not upscale
       svgPath,
       "-resize",
       `${size}x${size}`,
-      "-background",
-      "none",
       out,
     ]);
   }
@@ -136,7 +134,7 @@ for (const file of fs.readdirSync(iconsDir)) {
 
 const pngBySize = new Map();
 for (const size of SIZES) {
-  pngBySize.set(size, fs.readFileSync(renderPng(size)));
+  pngBySize.set(size, fs.readFileSync(await renderPng(size)));
 }
 
 writeIco(
