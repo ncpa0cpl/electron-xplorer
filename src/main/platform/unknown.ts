@@ -1,6 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import type { PlaceInfo, TrashRestoreItem } from "../../shared/fs-types";
+import { openWithSystemDefault } from "./system-default-app";
 import type { MainPlatform, MenuAcceleratorKey } from "./types";
 
 /**
@@ -80,6 +81,7 @@ export function createUnknownMainPlatform(): MainPlatform {
   return {
     id: "unknown",
     getStaticPlaces,
+    openPath: openWithSystemDefault,
     openInTerminal,
     openWithDialog,
     isValidAbsolutePath: (p) => path.isAbsolute(p),

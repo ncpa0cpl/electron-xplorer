@@ -84,8 +84,9 @@ export interface SystemApi {
   /** Moves a path to the OS trash (registered on the "fs:trash" channel). */
   trash(path: string): Promise<void>;
   /**
-   * Opens a path with the OS default application. Rejects with the error
-   * message returned by `shell.openPath` when the launch fails.
+   * Opens a file with its default application. On macOS that is the app last
+   * picked via `openWith` for the file's extension, if any, otherwise the OS
+   * default. Rejects with the launch error description.
    */
   openPath(path: string): Promise<void>;
   /** Opens a terminal emulator with the given directory as cwd. */

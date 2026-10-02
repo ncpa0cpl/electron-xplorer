@@ -16,6 +16,12 @@ export interface MainPlatform {
   readonly id: PlatformId;
   /** Well-known left-pane places (existence-filtered). */
   getStaticPlaces(): Promise<PlaceInfo[]>;
+  /**
+   * Opens a FILE with its default application: on darwin the app last picked
+   * via `openWithDialog` for the file's extension (when still installed),
+   * otherwise the OS default. Rejects with the launch error description.
+   */
+  openPath(p: string): Promise<void>;
   /** Opens the platform's terminal emulator in the given directory. */
   openInTerminal(dir: string): Promise<void>;
   /**

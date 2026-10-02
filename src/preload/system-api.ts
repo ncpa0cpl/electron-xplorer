@@ -10,7 +10,6 @@ export const systemApi: SystemApi = {
   getHomeDir: () => ipcRenderer.invoke("system:getHomeDir") as Promise<string>,
   getStaticPlaces: () =>
     ipcRenderer.invoke("system:getStaticPlaces") as Promise<PlaceInfo[]>,
-  // Rejects with the error string returned by `shell.openPath` on failure.
   openPath: (p) => ipcRenderer.invoke("system:openPath", p) as Promise<void>,
   openInTerminal: (p) =>
     ipcRenderer.invoke("system:openInTerminal", p) as Promise<void>,

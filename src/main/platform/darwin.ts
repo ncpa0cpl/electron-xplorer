@@ -7,8 +7,10 @@ import type {
   TrashEntryInfo,
   TrashRestoreItem,
 } from "../../shared/fs-types";
+import { getDefaultApp, setDefaultApp } from "../default-apps";
 import { posixShellQuote, tryCustomTerminal } from "./custom-terminal";
 import { homeSubdirPlaces, isDirectory, placeId } from "./posix-places";
+import { openWithSystemDefault } from "./system-default-app";
 import {
   removeDirEntries,
   restoreErrMessage,
@@ -58,12 +60,10 @@ async function openInTerminal(dir: string): Promise<void> {
 
 // ─── Open With (AppleScript application chooser) ─────────────────────────────
 
-/**
- * Runs `osascript -e <script>`, returning its stdout (rejecting on failure).
- */
-function runOsascript(script: string): Promise<string> {
+/** Runs a command to completion, returning its stdout (rejecting on failure). */
+function run(command: string, args: readonly string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    const proc = spawn("osascript", ["-e", script], {
+    const proc = spawn(command, args, {
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
@@ -75,10 +75,15 @@ function runOsascript(script: string): Promise<string> {
       if (code === 0) {
         resolve(stdout);
       } else {
-        reject(new Error(`osascript exited with ${code}: ${stderr.trim()}`));
+        reject(new Error(`${command} exited with ${code}: ${stderr.trim()}`));
       }
     });
   });
+}
+
+/** `open` exits as soon as Launch Services has handed the file to the app. */
+async function openWithApp(appPath: string, p: string): Promise<void> {
+  await run("open", ["-a", appPath, p]);
 }
 
 /** Escapes a string for a double-quoted AppleScript string literal. */
@@ -88,10 +93,11 @@ function appleScriptEscape(value: string): string {
 
 /**
  * Native app-chooser dialog via AppleScript's `choose application`, then
- * `open -a <appPath> <file>` with the picked app. Best-effort (this code
- * never ran on a real macOS host, like the rest of darwin.ts). If the user
- * cancels the chooser, osascript exits non-zero with a "User canceled"
- * message - treated as a no-op success, not an error.
+ * `open -a <appPath> <file>` with the picked app, which `openPath` uses for
+ * the file's extension from then on. Best-effort (this code never ran on a
+ * real macOS host, like the rest of darwin.ts). If the user cancels the
+ * chooser, osascript exits non-zero with a "User canceled" message - treated
+ * as a no-op success, not an error.
  */
 async function openWithDialog(p: string): Promise<void> {
   // `as alias` is required: on an application reference `POSIX path of` fails (-1728).
@@ -102,7 +108,7 @@ async function openWithDialog(p: string): Promise<void> {
 
   let appPath: string;
   try {
-    appPath = (await runOsascript(script)).trim();
+    appPath = (await run("osascript", ["-e", script])).trim();
   } catch (err) {
     // error -128 ("User canceled."): the user dismissed the chooser - no-op.
     if (err instanceof Error && /user canceled|-128/.test(err.message)) {
@@ -114,11 +120,21 @@ async function openWithDialog(p: string): Promise<void> {
     return;
   }
 
-  // Fire-and-forget: `open` returns once the app has been told to launch.
-  spawn("open", ["-a", appPath, p], {
-    detached: true,
-    stdio: "ignore",
-  }).unref();
+  await openWithApp(appPath, p);
+  await setDefaultApp(p, appPath);
+}
+
+/**
+ * macOS's chooser has no "always open with" option, so the app keeps its own
+ * per-extension defaults (src/main/default-apps.ts).
+ */
+async function openPath(p: string): Promise<void> {
+  const appPath = await getDefaultApp(p);
+  // A missing app may live on an unmounted volume, so its entry is kept.
+  if (appPath && (await isDirectory(appPath))) {
+    return openWithApp(appPath, p);
+  }
+  return openWithSystemDefault(p);
 }
 
 /**
@@ -259,6 +275,7 @@ export function createDarwinPlatform(): MainPlatform {
   return {
     id: "darwin",
     getStaticPlaces,
+    openPath,
     openInTerminal,
     openWithDialog,
     // POSIX: absolute = leading "/".

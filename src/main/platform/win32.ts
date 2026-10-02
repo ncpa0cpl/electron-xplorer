@@ -10,6 +10,7 @@ import { createPlatform } from "../../shared/platform/types";
 import { peekTrashRecord } from "../trash-records";
 import { tryCustomTerminal, win32ShellQuote } from "./custom-terminal";
 import { homeSubdirPlaces, isDirectory, placeId } from "./posix-places";
+import { openWithSystemDefault } from "./system-default-app";
 import { restoreErrMessage, restoreToOriginalLocation } from "./trash-common";
 import type { MainPlatform, MenuAcceleratorKey } from "./types";
 
@@ -501,6 +502,7 @@ export function createWin32MainPlatform(): MainPlatform {
   return {
     id: "win32",
     getStaticPlaces,
+    openPath: openWithSystemDefault,
     openInTerminal,
     openWithDialog,
     isValidAbsolutePath,

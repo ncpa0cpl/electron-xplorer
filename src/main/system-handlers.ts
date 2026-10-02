@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, shell } from "electron";
+import { BrowserWindow, ipcMain } from "electron";
 import os from "node:os";
 import type { PlaceInfo } from "../shared/fs-types";
 import type { PlatformId } from "../shared/platform/types";
@@ -57,16 +57,9 @@ async function getHomeDir(): Promise<string> {
   return os.homedir();
 }
 
-/**
- * Opens a path with the OS default application. `shell.openPath` resolves with
- * an empty string on success and an error description on failure - the error
- * string is propagated to the renderer by rejecting the IPC promise.
- */
+/** Opens a file with its default application (per platform). */
 async function openPath(p: string): Promise<void> {
-  const error = await shell.openPath(p);
-  if (error) {
-    throw new Error(error);
-  }
+  await getMainPlatform().openPath(p);
 }
 
 /** Opens a terminal emulator with the given directory as cwd (per platform). */

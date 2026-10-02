@@ -23,7 +23,10 @@ Forge + Vite) and the
   application; "Open With…" brings up the OS-native application-chooser
   dialog for a file (xdg-desktop-portal `OpenFile` with `ask` via a
   python3/GLib helper on Linux, `rundll32 shell32.dll,OpenAs_RunDLLW` on
-  Windows, AppleScript `choose application` on macOS); "Open in Terminal"
+  Windows, AppleScript `choose application` on macOS — macOS's chooser
+  cannot change the system default, so the app remembers the pick per file
+  extension in `userData/default-apps.json` and double-click uses it from
+  then on); "Open in Terminal"
   (with `$TERMINAL` support, per-terminal argument conventions, and a
   custom `$XPLORER_TERMINAL` command-line override — see "Open in Terminal"
   below); a left
@@ -376,6 +379,7 @@ src/
 │   ├── menu-handlers.ts    native menu → "menu:command" broadcasts
 │   ├── launch-handlers.ts  folders from argv / second launch / macOS
 │   │                       `open-file` → "launch:*" (single instance)
+│   ├── default-apps.ts     per-extension "Open With…" picks (macOS)
 │   └── window-state.ts     bounds-only window persistence
 ├── preload/                contextBridge API (window.xplorer)
 │   ├── index.ts            merges fs/system/watch/media/menu/dnd/launch namespaces

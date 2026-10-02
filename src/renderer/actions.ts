@@ -13,7 +13,7 @@ import { resolveTrashPath, TRASH_ROOT } from "./fs-adapter";
 import { rendererPlatform } from "./platform";
 
 /**
- * Shell integration for the explorer: system-default file opening, custom
+ * Shell integration for the explorer: default-app file opening, custom
  * context-menu actions ("Open With…", "Open in Terminal", "Delete
  * Permanently", "Restore" + "Empty Trash" for the trash), OS drag-in support
  * and window title synchronization.
@@ -53,10 +53,10 @@ export function registerExplorer(explorer: Explorer): void {
   setupWindowTitleSync(explorer);
 }
 
-/** Double-click on a file opens it with the OS default application. */
+/** Double-click on a file opens it with its default application. */
 export const openAction: NonNullable<ExplorerOptions["openAction"]> = () => {
   return (file: FStat) => {
-    void openWithSystemApp(file);
+    void openWithDefaultApp(file);
   };
 };
 
@@ -82,16 +82,16 @@ export const fileDropHandler: NonNullable<ExplorerOptions["fileDropHandler"]> =
     void handleOsFileDrop(dataTransfer, dirStat);
   };
 
-// ─── Open with system default app ────────────────────────────────────────────
+// ─── Open with default app ───────────────────────────────────────────────────
 
-async function openWithSystemApp(file: FStat): Promise<void> {
+async function openWithDefaultApp(file: FStat): Promise<void> {
   try {
     // Trash items carry virtual trash:// paths — resolve to the real path.
     await window.xplorer.openPath(resolveTrashPath(file.path));
   } catch (err) {
     const msg = errorMessage(err);
     console.error(
-      `Failed to open "${file.path}" with the system default application:`,
+      `Failed to open "${file.path}" with its default application:`,
       err,
     );
     if (explorerRef) {

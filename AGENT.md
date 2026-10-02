@@ -35,6 +35,8 @@ src/main/
   trash-handlers.ts      fs:listTrash / fs:restoreTrash / fs:emptyTrash
                          (emptyTrash also clears the sidecar ledger on success)
   trash-records.ts       userData/trash-records.json sidecar (originalPath ledger)
+  default-apps.ts        userData/default-apps.json: per-extension app picked via
+                         "Open With…" (darwin only; see darwin.ts openPath)
   system-handlers.ts     system:* channels (openPath, openInTerminal, openWith,
                          getHomeDir, getStaticPlaces, getPlatformInfo, setWindowTitle)
   window-handlers.ts     window:minimize|maximizeOrRestore|close|isMaximized +
@@ -73,7 +75,7 @@ src/renderer/
 
 ## Platform abstraction (the one-switch rule)
 
-- Main: the ONLY `process.platform` switch is `getMainPlatform()` in `src/main/platform/index.ts` → one of `linux.ts` / `darwin.ts` / `win32.ts` / `unknown.ts`, all implementing `MainPlatform` (`platform/types.ts`). Current interface: `getStaticPlaces`, `openInTerminal`, `openWithDialog`, `listTrash`, `restoreTrash`, `emptyTrash`, `isValidAbsolutePath`, `protocolPathToAbsolute`, `accelerator`, `usesAppMenu`, `quitAfterAllWindowsClosed`, `titlebarWindowOptions`.
+- Main: the ONLY `process.platform` switch is `getMainPlatform()` in `src/main/platform/index.ts` → one of `linux.ts` / `darwin.ts` / `win32.ts` / `unknown.ts`, all implementing `MainPlatform` (`platform/types.ts`). Current interface: `getStaticPlaces`, `openPath`, `openInTerminal`, `openWithDialog`, `listTrash`, `restoreTrash`, `emptyTrash`, `isValidAbsolutePath`, `protocolPathToAbsolute`, `accelerator`, `usesAppMenu`, `quitAfterAllWindowsClosed`, `titlebarWindowOptions`.
 - Renderer: platform crosses IPC exactly once (`system:getPlatformInfo`); all path/hidden-name logic goes through the pure `Platform` from `src/shared/platform/`. No `process.platform` in renderer code.
 - Adding platform behavior = extend `MainPlatform` + implement in all four files (`unknown.ts` rejects or no-ops). See README "Adding a platform".
 
@@ -98,7 +100,7 @@ src/renderer/
 - Spawn OS processes detached (`detached: true, stdio: "ignore"`, `.unref()`) unless collecting output.
 - Menu commands are renderer-executed (`MenuCommand` enum); the main menu only forwards clicks. `isTextEditing()` guard in `app.ts` protects against firing file commands while typing.
 - Window title syncs from the renderer (`setupWindowTitleSync`) — main never computes it.
-- `userData/` holds runtime state: `window-state.json`, `thumbnails/`, `trash-records.json`.
+- `userData/` holds runtime state: `window-state.json`, `thumbnails/`, `trash-records.json`, `default-apps.json`.
 - Trash: "delete" trashes (fs-handlers + sidecar record); the virtual `trash:///` place
   lists via `fs:listTrash`; "Empty Trash" (`fs:emptyTrash`, trash-handlers) permanently
   deletes everything — per-platform `emptyTrash()`: linux clears the FreeDesktop home
@@ -110,3 +112,11 @@ src/renderer/
   confirms via `explorer.prompt.ask`, then refreshes manually (no watcher on `trash:///`).
 - Trash DETECTION and PATH MODEL in the renderer: **every trash-derived FStat carries a VIRTUAL path** — `trash:///<name>` for items listed in the trash root, `trash:///<name>/<subpath>` for entries browsed inside a trashed directory — plus the `FStat.trash` tag (`originalPath`/`deletionTime` nullable). The fs adapter owns the virtual↔real mapping (module-level, keyed by top-level item NAME from the latest `fs:listTrash`): `resolveTrashPath()` rewrites virtual → real **in flight at every IPC boundary** (readdir/stat/copy/move/remove/exists/thumbnail and the `actions.ts` call sites for openPath/openWith/removePermanent/restoreTrash); the fs watcher bridge rewrites real trash-storage change events back to virtual dirPaths. Writes into the trash are rejected (copy/move/mkdir/touch + OS drag-in) and **all trash-derived entries are exposed read-only (`write: false`, `read: true`)** so the lib's context menu hides its built-in Delete/Cut/Rename on them; `remove()` on a trash path = permanent purge; rename within the trash anchors on the source's real location (target name isn't in the listing). Renderer actions gate via `isTrashItem()`/`isTrashLocation()` (tag-based) and resolve paths via `resolveTrashPath()` (pass-through for non-trash paths) — never send virtual paths to `window.xplorer` directly and never detect trash via path prefixes.
 - README.md is the user-facing doc (features, `XPLORER_TERMINAL`, packaging, platform matrix) — update it for user-visible behavior changes; AGENT.md is the agent-facing map.
+- Default apps on macOS: `choose application` cannot set the system default,
+  so darwin's `openWithDialog` records the picked app per lowercased file
+  extension (`default-apps.ts`; extensionless files are never recorded) and
+  darwin's `openPath` (double-click) uses it while the app bundle exists,
+  else `shell.openPath`. Other platforms' choosers set the real OS default, so
+  their `openPath` is plain `shell.openPath` (`platform/system-default-app.ts`).
+  Picking a different app via "Open With…" replaces the entry; there is no
+  reset UI.

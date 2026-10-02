@@ -10,6 +10,7 @@ import type {
 } from "../../shared/fs-types";
 import { posixShellQuote, tryCustomTerminal } from "./custom-terminal";
 import { homeSubdirPlaces, isDirectory } from "./posix-places";
+import { openWithSystemDefault } from "./system-default-app";
 import {
   removeDirEntries,
   restoreErrMessage,
@@ -639,6 +640,7 @@ export function createLinuxPlatform(): MainPlatform {
   return {
     id: "linux",
     getStaticPlaces,
+    openPath: openWithSystemDefault,
     openInTerminal,
     openWithDialog,
     isValidAbsolutePath: (p) => path.isAbsolute(p),
