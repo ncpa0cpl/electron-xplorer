@@ -18,6 +18,7 @@ import { registerWatcherHandlers } from "./watcher-handlers";
 // visited directory is deliberately never persisted: the app opens in the
 // home directory, or in the folder it was launched with).
 import {
+  attachInputContextMenu,
   registerWindowHandlers,
   trackWindowMaximizedState,
 } from "./window-handlers";
@@ -88,6 +89,10 @@ const createWindow = () => {
   mainWindow.setAutoHideMenuBar(true);
 
   registerWindowEnterLeaveWatcher(mainWindow);
+
+  // Native edit context menu on editable fields (Undo/Cut/Copy/Paste/...).
+  // Attached right after creation, like the other per-window hooks below.
+  attachInputContextMenu(mainWindow);
 
   // Push maximize/unmaximize state to the renderer titlebar
   // ("window:maximizedChanged" channel). Attached right after creation so no

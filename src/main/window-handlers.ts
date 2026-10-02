@@ -1,4 +1,5 @@
-import { BrowserWindow, ipcMain } from "electron";
+import { BrowserWindow, ipcMain, Menu } from "electron";
+import type { MenuItemConstructorOptions } from "electron";
 
 /**
  * Window-control IPC handlers ("window:*" channels): minimize / maximize /
@@ -38,6 +39,45 @@ export function registerWindowHandlers(): void {
   // asks once right after mounting the titlebar).
   ipcMain.handle("window:isMaximized", (event) => {
     return BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false;
+  });
+}
+
+/**
+ * Attaches a native edit context menu to a window, shown ONLY when the
+ * right-click target is an editable field (`params.isEditable`: path bar,
+ * rename prompt, search box, ...). Electron never shows a default context
+ * menu, so without this RMB on inputs is a no-op and copy/paste is
+ * keyboard-only.
+ *
+ * Roles (`cut`/`copy`/`paste`/...) act on the webContents' *text* selection,
+ * which is exactly what we want here and is distinct from the lib's file
+ * clipboard (see menu-handlers.ts for why roles must NOT be used in the
+ * application menu). Deliberately no accelerators on these items: the
+ * renderer already binds Ctrl+C/X/V/A with focus guards, and adding
+ * accelerators here would intercept keys before the renderer sees them.
+ *
+ * Must be called right after each window's creation (see createWindow in
+ * src/main/index.ts).
+ */
+export function attachInputContextMenu(win: Electron.BrowserWindow): void {
+  win.webContents.on("context-menu", (_event, params) => {
+    if (!params.isEditable) {
+      return;
+    }
+    // `enabled` states derive from the event's edit flags so items the
+    // action cannot apply to (e.g. Copy with no selection) are greyed out.
+    const flags = params.editFlags;
+    const template: MenuItemConstructorOptions[] = [
+      { role: "undo", enabled: flags.canUndo },
+      { role: "redo", enabled: flags.canRedo },
+      { type: "separator" },
+      { role: "cut", enabled: flags.canCut },
+      { role: "copy", enabled: flags.canCopy },
+      { role: "paste", enabled: flags.canPaste },
+      { type: "separator" },
+      { role: "selectAll", enabled: flags.canSelectAll },
+    ];
+    Menu.buildFromTemplate(template).popup({ window: win });
   });
 }
 
