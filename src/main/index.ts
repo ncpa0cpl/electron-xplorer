@@ -59,7 +59,7 @@ const createWindow = () => {
     height: state?.height ?? 800,
     x: state?.x,
     y: state?.y,
-    minWidth: 720,
+    minWidth: 920,
     minHeight: 480,
     // Created hidden; shown on `ready-to-show` below to avoid a white flash
     // before the renderer paints.
