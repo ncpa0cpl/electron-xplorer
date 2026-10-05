@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@ncpa0cpl/fs-explorer": "^1.0.1",
-    "@ncpa0cpl/vanilla-jsx": "^0.0.1-alpha.52",
+    "@ncpa0cpl/vanilla-jsx": "^0.0.1-alpha.53",
     "adwavecss": "^0.2.6",
     "adwaveui": "^0.3.2",
     "async-await-queue": "^2.1.4",
