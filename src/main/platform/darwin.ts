@@ -168,6 +168,9 @@ async function getStaticPlaces(): Promise<PlaceInfo[]> {
 
 function accelerator(key: MenuAcceleratorKey): string {
   switch (key) {
+    case "new-window":
+      // Electron maps CmdOrCtrl to Cmd on darwin.
+      return "CmdOrCtrl+N";
     case "new-tab":
       // Electron maps CmdOrCtrl to Cmd on darwin.
       return "CmdOrCtrl+T";

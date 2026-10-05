@@ -32,6 +32,7 @@ function onMaximizedChanged(_event: IpcRendererEvent, payload: unknown): void {
 ipcRenderer.on("window:maximizedChanged", onMaximizedChanged);
 
 export const windowApi: WindowApi = {
+  openNewWindow: () => ipcRenderer.invoke("window:new") as Promise<void>,
   minimize: () => ipcRenderer.invoke("window:minimize") as Promise<void>,
   maximizeOrRestore: () =>
     ipcRenderer.invoke("window:maximizeOrRestore") as Promise<void>,

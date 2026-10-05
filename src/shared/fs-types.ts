@@ -128,6 +128,12 @@ export interface DndApi {
    * over the in-progress drag ("system:drag-out" channel, fire-and-forget).
    */
   dragOut(paths: string[]): void;
+  /**
+   * Claims ownership of a drop for the calling window: `true` when every
+   * given path was just dragged out of this app (the drag is a MOVE, not a
+   * copy) - the records are consumed so a later drop cannot claim them.
+   */
+  takeOwnDrag(paths: string[]): Promise<boolean>;
   startCursorWatcher(): void;
   stopCursorWatcher(): void;
   onCursorEnter(cb: () => void): () => void;
@@ -182,6 +188,11 @@ export interface TrashApi {
  * (src/renderer/titlebar.ts).
  */
 export interface WindowApi {
+  /**
+   * Opens a new application window (File > New Window, the toolbar "New
+   * Window" action, and external OS new-window requests share this path).
+   */
+  openNewWindow(): Promise<void>;
   /** Minimizes the window that hosts the calling renderer. */
   minimize(): Promise<void>;
   /** Maximizes the window, or restores it if it is already maximized. */

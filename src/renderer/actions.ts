@@ -63,6 +63,14 @@ export const openAction: NonNullable<ExplorerOptions["openAction"]> = () => {
 /** Actions shown in the explorer toolbar menu. */
 export const explorerActions: readonly ExplorerAction[] = [
   {
+    label: "New Window",
+    // Same window-creation path as File > New Window and external OS
+    // new-window requests. No explorer state needed, hence the unused param.
+    run: () => {
+      void window.xplorer.openNewWindow();
+    },
+  },
+  {
     label: "Open Terminal Here",
     run: (explorer) => {
       const stat = explorer.getCurrentDir().stat;
@@ -378,12 +386,14 @@ export const fileActions: readonly FileAction[] = [
 // ─── OS drag-in ──────────────────────────────────────────────────────────────
 
 /**
- * Handles OS drag-in: files dropped into a directory (from a system file
- * manager, or from another application — including drags that were handed
- * to the OS by this app's own drag-out, which are indistinguishable from
- * external drags and therefore dropped back in as COPIES). The dropped
- * `File` objects are resolved to paths via the preload bridge and COPIED
- * into the target directory using the recursive/force `fs:copy` channel.
+ * Handles OS drag-in: files dropped into a directory from OUTSIDE the
+ * explorer's emulated drag — a system file manager, another application, or
+ * a drag handed to the OS by this app's own drag-out (leaving one window and
+ * dropping into another is exactly that). The dropped `File` objects are
+ * resolved to paths via the preload bridge and transferred into the target
+ * directory: MOVE when the paths are claimed as an app-initiated drag
+ * (`takeOwnDrag`), COPY otherwise. Entries whose name already exists in the
+ * target directory are prompted for overwrite first.
  *
  * (Internal, in-window drags never reach this handler: they use the lib's
  * own emulated drag, which performs MOVE directly.)
@@ -438,39 +448,111 @@ async function handleOsFileDrop(
     return;
   }
 
-  const results = await Promise.allSettled(
-    paths.map((entry) => window.xplorer.copy(entry.path, dirStat.path)),
+  // App-canonicalize before the ownership check: `getPathForFile` returns
+  // the OS-native form (backslashes on Windows), while drag-out registered
+  // the app-canonical form. The claim is all-or-nothing by design.
+  const ownDrag = await window.xplorer.takeOwnDrag(
+    paths.map((entry) => rendererPlatform().paths.normalize(entry.path)),
   );
 
-  const copyFailures = results
-    .map((result, i) => ({ entry: paths[i]!, result }))
+  // Existence check over the raw IPC: the lib's public `fs` type
+  // (FsController) does not expose `readdir`. A failed listing cancels the
+  // transfer: an unlisted directory has no verifiable overwrite check.
+  let existingNames: Set<string>;
+  try {
+    existingNames = new Set(
+      (await window.xplorer.readdirStat(dirStat.path)).map((e) => e.name),
+    );
+  } catch (err) {
+    console.error(
+      `Drag-in: could not list the target directory "${dirStat.path}":`,
+      err,
+    );
+    if (explorerRef) {
+      showActionError(
+        explorerRef,
+        "Could not check the target directory for existing files; nothing was transferred.",
+      );
+    }
+    return;
+  }
+
+  // Overwrite guard: fs:copy/fs:move overwrite silently by design - the
+  // lib's contract is that CALLERS prompt first (fs-controller's copy/move
+  // do via `prompt.ask`).
+  const toTransfer: { name: string; path: string; dest: string }[] = [];
+  for (const entry of paths) {
+    const dest = rendererPlatform().paths.join(dirStat.path, entry.name);
+    // Dropping a file onto its own location is a no-op (fs.cp errors on
+    // from==to; the lib's internal move skips the same case).
+    if (rendererPlatform().paths.normalize(entry.path) === dest) {
+      continue;
+    }
+    if (!existingNames.has(entry.name)) {
+      toTransfer.push({ name: entry.name, path: entry.path, dest });
+      continue;
+    }
+    let answer: { answer: boolean } | undefined;
+    try {
+      answer = await explorerRef!.prompt.ask({
+        title: "File already exist",
+        message:
+          `File "${entry.name}" already exists, do you want to overwrite it?`,
+        cancelBtnLabel: "Skip",
+        confirmBtnLabel: "Overwrite",
+      });
+    } catch {
+      // Prompt aborted (e.g. Escape) - treat as "Skip".
+    }
+    if (answer?.answer === true) {
+      toTransfer.push({ name: entry.name, path: entry.path, dest });
+    }
+  }
+
+  if (toTransfer.length === 0) {
+    return;
+  }
+
+  const results = await Promise.allSettled(
+    // `fs:copy`/`fs:move`'s `to` is the FULL destination path (fed straight
+    // to `fs.cp`), not a parent directory.
+    toTransfer.map(({ path, dest }) =>
+      ownDrag
+        ? window.xplorer.move(path, dest)
+        : window.xplorer.copy(path, dest)
+    ),
+  );
+
+  const verb = ownDrag ? "move" : "copy";
+  const transferFailures = results
+    .map((result, i) => ({ entry: toTransfer[i]!, result }))
     .filter(
       (
         x,
       ): x is {
-        entry: { name: string; path: string };
+        entry: { name: string; path: string; dest: string };
         result: PromiseRejectedResult;
       } => x.result.status === "rejected",
     );
 
-  for (const { entry, result } of copyFailures) {
+  for (const { entry, result } of transferFailures) {
     console.error(
-      `Drag-in: failed to copy "${entry.path}" into "${dirStat.path}":`,
+      `Drag-in: failed to ${verb} "${entry.path}" into "${dirStat.path}":`,
       result.reason,
     );
   }
 
-  if (copyFailures.length > 0 && explorerRef) {
-    const names = copyFailures.map(({ entry }) => trimTo(entry.name, 24)).join(
-      ", ",
-    );
+  if (transferFailures.length > 0 && explorerRef) {
+    const names = transferFailures
+      .map(({ entry }) => trimTo(entry.name, 24))
+      .join(", ");
     showActionError(
       explorerRef,
-      copyFailures.length === paths.length
-        ? `Could not copy the dropped files: ${trimTo(names, 100)}`
-        : `Copied ${
-          paths.length - copyFailures.length
-        } of ${paths.length} dropped items; failed: ${trimTo(names, 100)}`,
+      transferFailures.length === toTransfer.length
+        ? `Could not ${verb} the dropped files: ${trimTo(names, 100)}`
+        : `${verb === "move" ? "Moved" : "Copied"} ${
+          toTransfer.length - transferFailures.length
+        } of ${toTransfer.length} items; failed: ${trimTo(names, 100)}`,
     );
   }
 }

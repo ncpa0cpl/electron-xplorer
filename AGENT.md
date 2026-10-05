@@ -19,7 +19,7 @@ yarn test-platform  # scripts/test-platform.mjs — platform-module smoke test
 
 Three Vite bundles (`vite.main.config.mts`, `vite.preload.config.mts`, `vite.renderer.config.mts`; shared resolve helpers in `vite.shared.mts`):
 
-- **Main** — `src/main.ts` → `src/main/index.ts`. Window creation, app lifecycle, all `ipcMain` handlers, menu bar, file watching, thumbnails, platform OS integration. Forge config: `forge.config.ts` (asar, Makers for win/mac/linux, VitePlugin, fuses).
+- **Main** — `src/main.ts` → `src/main/index.ts`. App lifecycle, window creation (`window-creator.ts`, multiple windows supported), all `ipcMain` handlers, menu bar, file watching, thumbnails, platform OS integration. Forge config: `forge.config.ts` (asar, Makers for win/mac/linux, VitePlugin, fuses).
 - **Preload** — `src/preload.ts` → `src/preload/index.ts`. `contextIsolation: true`, `nodeIntegration: false`, `sandbox: false`. Merges per-domain API modules into `window.xplorer`.
 - **Renderer** — `src/renderer/index.ts` → `src/renderer/app.ts` `bootstrap()`.
 
@@ -27,7 +27,11 @@ Three Vite bundles (`vite.main.config.mts`, `vite.preload.config.mts`, `vite.ren
 
 ```
 src/main/
-  index.ts               app entry: createWindow(), handler registration, single-window
+  index.ts               app entry: handler registration, app lifecycle events
+  window-creator.ts      createWindow() shared by ALL "new window" entry points
+                         (menu File > New Window, "window:new" channel, OS
+                         new-window re-launch); per-window hooks attached here;
+                         only the first window restores persisted bounds
   ipc.ts                 typed handle(channel, argSpec, fn) wrapper — validates "path" args
                          (non-empty, no NUL byte, platform-absolute)
   fs-handlers.ts         fs:* channels (readdirStat, stat, copy, move, remove, mkdir,
@@ -44,7 +48,9 @@ src/main/
   window-state.ts        persists window bounds/maximized to userData/window-state.json
   menu-handlers.ts       native app menu; pushes menu:command (MenuCommand enum,
                          src/shared/menu-types.ts) to the renderer
-  watcher-handlers.ts    one non-recursive fs.watch per visited dir → pushes fs:change
+  watcher-handlers.ts    one non-recursive fs.watch per dir open in ANY window
+                         (per-window "watch:setDirs" declarations, unioned by
+                         sender) → pushes fs:change
   media-handlers.ts / media-protocol.ts   thumbnails (nativeImage, disk cache,
                          xmedia:// URL protocol), getMediaUrl for preview playback
   drag-handlers.ts       OS drag-out + cursor watcher (system:drag-out, start/stop-cursor-watcher)

@@ -44,11 +44,19 @@ Forge + Vite) and the
   support (seekable `<video>`).
 - **OS drag-and-drop, both directions** — drag entries **out** to any
   system target via `webContents.startDrag`; drag files **in** from a
-  system file manager and they are copied (internal drags between tabs
-  move).
-- **Native application menu** with shortcuts (new/close tab, refresh, show
-  hidden, back/forward/up/home, copy/cut/paste/select-all, delete, rename)
-  mapped onto the fs-explorer public API.
+  system file manager and they are copied. Internal drags between tabs
+  move, and so do drops back into this app (a drag handed to the OS and
+  dropped into another window of this app is recognized and moved).
+- **Multiple windows** — open as many explorer windows as you like: File >
+  New Window (`Ctrl+N`, `Cmd+N` on macOS), the toolbar menu's "New Window"
+  action, or an external OS new-window request (e.g. GNOME Dash-to-Dock:
+  right-click the dock icon → New Window re-launches the app, which the
+  single-instance lock turns into a new window). Only the first window
+  restores the persisted bounds; additional windows open at the default size,
+  cascaded.
+- **Native application menu** with shortcuts (new window, new/close tab,
+  refresh, show hidden, back/forward/up/home, copy/cut/paste/select-all,
+  delete, rename) mapped onto the fs-explorer public API.
 - **Window bounds persistence** — size/position/maximized state restored
   across restarts (`userData/window-state.json`); deliberately never
   persists the last visited directory (the app always opens in `$HOME`).
@@ -364,7 +372,10 @@ src/
 ├── main.ts                 thin entry (bundle basename → .vite/build/main.cjs)
 ├── preload.ts              thin entry (→ .vite/build/preload.cjs)
 ├── main/                   main process
-│   ├── index.ts            app lifecycle, window creation, devtools opt-in
+│   ├── index.ts            app lifecycle, handler registration, devtools opt-in
+│   ├── window-creator.ts   createWindow() — every "new window" entry point
+│   │                       (menu, toolbar action, OS new-window request)
+│   │                       + "window:new" channel
 │   ├── ipc.ts              typed `ipcMain.handle` wrapper w/ arg validation
 │   ├── fs-handlers.ts      "fs:*" channels (batched readdirStat, copy/move/
 │   │                       trash, mkdir/touch, readFile, …)

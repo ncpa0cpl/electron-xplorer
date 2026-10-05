@@ -59,8 +59,9 @@ export async function bootstrap(): Promise<void> {
       actions: fileActions,
       // Toolbar menu extras: "Open Terminal Here".
       explorerActions,
-      // OS drag-in: copies files dropped from a system file manager into the
-      // target directory via the `fs:copy` channel.
+      // OS drag-in: drops from a system file manager are copied into the target
+      // directory; drops whose files were dragged out of this app are moved
+      // (see actions.ts).
       fileDropHandler,
       // OS drag-out: hands an in-progress emulated drag to the OS when the
       // pointer leaves the window (see drag-out.ts for the hybrid model).

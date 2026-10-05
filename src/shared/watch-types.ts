@@ -28,10 +28,10 @@ export interface WatchApi {
    */
   onFsChange(cb: (event: FsChangeEvent) => void): () => void;
   /**
-   * Declares the exact set of directories main should watch: the dirs
-   * currently open in the app's tabs (real native paths). Replaces the
-   * previous set wholesale on every call — watchers for dirs that fell out
-   * of the set are closed. Fire-and-forget ("watch:setDirs" channel).
+   * Declares the exact set of directories the calling window has open in
+   * its tabs (real native paths). Main watches the UNION of all windows'
+   * declarations: a dir's watcher is closed only when no window declares it
+   * anymore. Fire-and-forget ("watch:setDirs" channel).
    */
   setWatchedDirs(dirs: readonly string[]): void;
 }

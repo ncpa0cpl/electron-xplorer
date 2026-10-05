@@ -88,6 +88,7 @@ export interface TitlebarWindowOptions {
 
 /** Logical accelerator keys the app menu uses. */
 export type MenuAcceleratorKey =
+  | "new-window"
   | "new-tab"
   | "close-tab"
   | "refresh"

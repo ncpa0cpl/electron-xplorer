@@ -3,6 +3,7 @@ import type { MenuItemConstructorOptions } from "electron";
 import type { MenuCommand } from "../shared/menu-types";
 import { getMainPlatform } from "./platform";
 import type { MenuAcceleratorKey } from "./platform/types";
+import { createWindow } from "./window-creator";
 
 /**
  * Native application menu.
@@ -54,12 +55,23 @@ function buildMenuTemplate(): MenuItemConstructorOptions[] {
     getMainPlatform().accelerator(key);
   // Dev-only items (Reload App / Toggle DevTools) are only present when
   // DevTools were requested via the environment, mirroring the
-  // ELECTRON_XPLORER_DEVTOOLS gate for auto-opening them in main/index.ts.
+  // ELECTRON_XPLORER_DEVTOOLS gate for auto-opening them in
+  // main/window-creator.ts.
   const isDev = process.env.ELECTRON_XPLORER_DEVTOOLS === "1";
   const template: MenuItemConstructorOptions[] = [
     {
       label: "File",
       submenu: [
+        {
+          label: "New Window",
+          accelerator: accel("new-window"),
+          // Main-process action, not a renderer broadcast like the items below:
+          // window lifecycle is main's responsibility.
+          click: () => {
+            createWindow();
+          },
+        },
+        { type: "separator" },
         {
           label: "New Tab",
           accelerator: accel("new-tab"),

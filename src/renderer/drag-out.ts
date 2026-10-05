@@ -15,9 +15,11 @@ import { rendererPlatform } from "./platform";
  *   still held at that point, so the pointer grab is live and Electron can
  *   take over the drag session mid-gesture.
  * - **Dropping back into the app**: once a drag has been handed to the OS it
- *   is indistinguishable from a drag coming from any external application,
- *   so dropping it back into this app is a COPY (handled by the regular OS
- *   drag-in path in `actions.ts`) — same as real file managers.
+ *   can no longer use the library's emulated-drop path; the drop arrives as
+ *   a regular OS drag-in (`actions.ts`), which recognizes the dragged paths
+ *   via `takeOwnDrag` and moves instead of copying - so dragging between two
+ *   windows (or out and back into the same one) moves, like real file
+ *   managers.
  *
  * The handler below is invoked by the library only when an already-active
  * emulated drag leaves the window; no OS drag is ever started for drags that

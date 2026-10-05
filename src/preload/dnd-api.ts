@@ -17,6 +17,8 @@ import type { DndApi } from "../shared/fs-types";
 export const dndApi: DndApi = {
   getPathForFile: (file) => webUtils.getPathForFile(file),
   dragOut: (paths) => ipcRenderer.send("system:drag-out", paths),
+  takeOwnDrag: (paths) =>
+    ipcRenderer.invoke("system:takeOwnDrag", paths) as Promise<boolean>,
   startCursorWatcher: () => ipcRenderer.send("system:start-cursor-watcher"),
   stopCursorWatcher: () => ipcRenderer.send("system:stop-cursor-watcher"),
   onCursorEnter: (cb: () => void) => {

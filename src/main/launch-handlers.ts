@@ -17,8 +17,9 @@ let receiver: WebContents | undefined;
  * Also queues the folders in this process's own argv. Call once, before
  * `ready`: macOS emits `open-file` for the launching folder before it.
  *
- * @param createWindow - Called when a request arrives while the app has no
- *   window (macOS keeps running after its last window closes).
+ * @param createWindow - Called when a folder-less re-launch arrives (an
+ *   external OS "New Window" request) or when a request arrives while the
+ *   app has no window (macOS keeps running after its last window closes).
  */
 export function registerLaunchHandlers(createWindow: () => void): void {
   queuedFolders.push(...argvFolders(process.argv));
@@ -34,7 +35,19 @@ export function registerLaunchHandlers(createWindow: () => void): void {
   });
 
   app.on("second-instance", (_event, argv) => {
-    openFolders(argvFolders(argv), createWindow);
+    const folders = argvFolders(argv);
+    if (folders.length === 0) {
+      // A folder-less re-launch - which is how external OS "New Window" requests
+      // arrive (e.g. GNOME Dash-to-Dock: RMB on the dock icon → New Window
+      // re-executes the desktop entry; the single-instance lock turns it
+      // into this event). Open ANOTHER window instead of focusing the
+      // existing one, as file managers conventionally do.
+      createWindow();
+      return;
+    }
+    // A launch carrying folder paths ("Open folder with…") - open them as
+    // tabs in the existing window.
+    openFolders(folders, createWindow);
   });
 }
 

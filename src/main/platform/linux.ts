@@ -398,6 +398,8 @@ async function getStaticPlaces(): Promise<PlaceInfo[]> {
 
 function accelerator(key: MenuAcceleratorKey): string {
   switch (key) {
+    case "new-window":
+      return "Ctrl+N";
     case "new-tab":
       return "Ctrl+T";
     case "close-tab":

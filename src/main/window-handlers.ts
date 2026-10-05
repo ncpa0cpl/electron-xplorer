@@ -6,6 +6,11 @@ import type { MenuItemConstructorOptions } from "electron";
  * restore / close, plus maximized-state push for the custom integrated
  * titlebar (src/renderer/titlebar.ts).
  *
+ * The one "window:*" channel NOT registered here is "window:new" (opens a
+ * new application window): it lives in window-creator.ts, which owns window
+ * creation and imports this module - registering it here as well would
+ * create an import cycle.
+ *
  * All invoke handlers resolve the TARGET WINDOW from the event sender
  * (`BrowserWindow.fromWebContents`) rather than a global singleton, so the
  * channels keep working per-window and are inert (graceful no-ops) if the
@@ -57,7 +62,7 @@ export function registerWindowHandlers(): void {
  * accelerators here would intercept keys before the renderer sees them.
  *
  * Must be called right after each window's creation (see createWindow in
- * src/main/index.ts).
+ * src/main/window-creator.ts).
  */
 export function attachInputContextMenu(win: Electron.BrowserWindow): void {
   win.webContents.on("context-menu", (_event, params) => {
@@ -87,7 +92,7 @@ export function attachInputContextMenu(win: Electron.BrowserWindow): void {
  * "window:maximizedChanged" channel as a plain boolean.
  *
  * Must be called right after each window's creation (see createWindow in
- * src/main/index.ts) so no state change can be missed.
+ * src/main/window-creator.ts) so no state change can be missed.
  */
 export function trackWindowMaximizedState(win: Electron.BrowserWindow): void {
   const send = (maximized: boolean): void => {

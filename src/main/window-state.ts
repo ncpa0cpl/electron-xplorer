@@ -15,7 +15,8 @@ import path from "node:path";
  * - position kept only when the restored window rect intersects at least one
  *   connected display, otherwise dropped so Electron's default centering
  *   applies (x/y are simply omitted from the BrowserWindow options);
- * - the maximized flag is restored after `ready-to-show` (see main/index.ts).
+ * - the maximized flag is restored after `ready-to-show` (see
+ *   main/window-creator.ts).
  */
 
 export interface WindowState {
@@ -26,7 +27,7 @@ export interface WindowState {
   readonly maximized: boolean;
 }
 
-/** Must mirror the BrowserWindow minWidth/minHeight in main/index.ts. */
+/** Must mirror the BrowserWindow minWidth/minHeight in main/window-creator.ts. */
 const MIN_WIDTH = 720;
 const MIN_HEIGHT = 480;
 

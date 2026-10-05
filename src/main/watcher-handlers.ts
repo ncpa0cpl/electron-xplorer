@@ -7,13 +7,13 @@ import type { FsChangeEvent } from "../shared/watch-types";
  * Filesystem watcher service.
  *
  * Keeps one NON-recursive `fs.watch(dir)` subscription per directory that is
- * currently open in a renderer tab. The renderer declares WHICH dirs to watch
- * via the `watch:setDirs` IPC message (fired by fs-explorer's
- * `Filesystem.setWatchedDirs` whenever the set of open tab dirs changes; the
- * renderer adapter maps virtual trash locations to their real OS trash
- * storage dirs first). This service synchronizes its registry to that set:
- * watchers for dirs that fell out of the set are closed, watchers for newly
- * declared dirs are created. Never uses `{ recursive: true }` (watching `/`
+ * currently open in ANY renderer tab. Each renderer (window) declares WHICH
+ * dirs its own tabs have open via the `watch:setDirs` IPC message (fired by
+ * fs-explorer's `Filesystem.setWatchedDirs` whenever that window's set of
+ * open tab dirs changes; the renderer adapter maps virtual trash locations
+ * to their real OS trash storage dirs first). Main keys the declarations by
+ * sender and synchronizes the watcher registry to their UNION. Never uses
+ * `{ recursive: true }` (watching `/`
  * or `$HOME` recursively would cause an inotify storm).
  *
  * Registry properties:
@@ -38,6 +38,12 @@ interface WatcherEntry {
 }
 
 const watchers = new Map<string, WatcherEntry>();
+/**
+ * Watched dirs declared per renderer, keyed by webContents id. One window's
+ * declaration must never be treated as the whole desired set - that would
+ * drop every other window's watchers.
+ */
+const declaredDirs = new Map<number, string[]>();
 let quitHookInstalled = false;
 
 /** Registers the watcher service. Call once during app startup. */
@@ -48,8 +54,19 @@ export function registerWatcherHandlers(): void {
   // Renderer-declared watched set. Registered with raw `ipcMain.on`
   // (fire-and-forget; the typed `handle` helper only validates path-string
   // arguments), with the payload validated inline below.
-  ipcMain.on("watch:setDirs", (_event, dirs: unknown) => {
-    setWatchedDirs(validateDirs(dirs));
+  ipcMain.on("watch:setDirs", (event, dirs: unknown) => {
+    declaredDirs.set(event.sender.id, validateDirs(dirs));
+    syncWatchedDirs();
+  });
+
+  // A closed window's declaration must be dropped promptly - its renderer
+  // will never re-declare, so its dirs would be watched forever otherwise.
+  app.on("web-contents-created", (_event, wc) => {
+    wc.once("destroyed", () => {
+      if (declaredDirs.delete(wc.id)) {
+        syncWatchedDirs();
+      }
+    });
   });
 
   // Clean shutdown: never let open watchers outlive the app.
@@ -59,12 +76,34 @@ export function registerWatcherHandlers(): void {
 }
 
 /**
- * Synchronizes the watcher registry to the renderer-declared set: closes
- * watchers for dirs that are no longer declared, creates watchers for new
- * ones. Never throws; directories that cannot be watched are silently
- * skipped (and retried on the next sync that still declares them).
+ * Rebuilds the desired dir set from all live renderers' declarations.
  */
-export function setWatchedDirs(dirs: readonly string[]): void {
+function syncWatchedDirs(): void {
+  // Defensive prune: senders that died without firing `destroyed` here
+  // (e.g. a crashed renderer) would otherwise pin their dirs forever.
+  for (const id of [...declaredDirs.keys()]) {
+    const wc = webContents.fromId(id);
+    if (!wc || wc.isDestroyed()) {
+      declaredDirs.delete(id);
+    }
+  }
+
+  const desired = new Set<string>();
+  for (const dirs of declaredDirs.values()) {
+    for (const dir of dirs) {
+      desired.add(dir);
+    }
+  }
+  setWatchedDirs([...desired]);
+}
+
+/**
+ * Synchronizes the watcher registry to one dir set: closes watchers for dirs
+ * that are no longer in it, creates watchers for new ones. Never throws;
+ * directories that cannot be watched are silently skipped (and retried on
+ * the next sync that still declares them).
+ */
+function setWatchedDirs(dirs: readonly string[]): void {
   const desired = new Set(dirs);
 
   for (const dir of [...watchers.keys()]) {
