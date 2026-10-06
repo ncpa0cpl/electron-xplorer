@@ -5,7 +5,7 @@
     "": {
       "name": "electron-xplorer",
       "dependencies": {
-        "@ncpa0cpl/fs-explorer": "^1.0.1",
+        "@ncpa0cpl/fs-explorer": "^1.0.2",
         "@ncpa0cpl/vanilla-jsx": "^0.0.1-alpha.53",
         "adwavecss": "^0.2.6",
         "adwaveui": "^0.3.2",
@@ -208,7 +208,7 @@
 
     "@malept/cross-spawn-promise": ["@malept/cross-spawn-promise@2.0.0", "", { "dependencies": { "cross-spawn": "^7.0.1" } }, "sha512-1DpKU0Z5ThltBwjNySMC14g0CkbyhCaz9FkhxqNsZI6uAPJXFS8cMXlBKo26FJ8ZuW6S9GCMcR9IO5k2X5/9Fg=="],
 
-    "@ncpa0cpl/fs-explorer": ["@ncpa0cpl/fs-explorer@1.0.1", "", { "dependencies": { "@ncpa0cpl/vanilla-jsx": "^0.0.1-alpha.52", "adwavecss": "^0.2.5", "adwaveui": "^0.2.1", "async-await-queue": "^2.1.4", "lodash.throttle": "^4.1.1", "luxon": "^3.7.2" }, "peerDependencies": { "typescript": "^5.9.3" } }, "sha512-+yz1OO7QwrHzsgkNm8dNbnJC5ih6sX2U1o0XXPFWDEuyJtkRuve3ljdKz9ZUGikfycfM8uxbtSGg58yV02agZQ=="],
+    "@ncpa0cpl/fs-explorer": ["@ncpa0cpl/fs-explorer@1.0.2", "", { "dependencies": { "@ncpa0cpl/vanilla-jsx": "^0.0.1-alpha.53", "adwavecss": "^0.2.5", "adwaveui": "^0.2.1", "async-await-queue": "^2.1.4", "lodash.throttle": "^4.1.1", "luxon": "^3.7.2" }, "peerDependencies": { "typescript": "^5.9.3" } }, "sha512-OVuGkC+HJvlnFQR9mk8R4hQniiRMTeHf0kU8/mS/oUcgryivaJ6S3fn8TCVsZ5+0joFAeitoFDlppy8bii2AgQ=="],
 
     "@ncpa0cpl/vanilla-jsx": ["@ncpa0cpl/vanilla-jsx@0.0.1-alpha.52", "", { "dependencies": { "html-element-attributes": "^3.4.0", "immer": "^10.1.1" } }, "sha512-GcwAATZF4qPh7sx9Qv3Jm5Y2M8geelxvI5C/XhAs+EfhNVr3thIzwZEM/suCwtPoJgqZgtwiDViSX75qKloT/g=="],
 
