@@ -46,7 +46,7 @@ export function buildCustomTerminalCommand(
   if (template.includes("{dir}")) {
     return template.replaceAll("{dir}", quotedDir);
   }
-  return `${template} ${quotedDir}`;
+  return `${template}${quotedDir}`;
 }
 
 /**
@@ -66,8 +66,10 @@ export function buildCustomTerminalCommand(
 export function tryCustomTerminal(
   dir: string,
   shellQuote: (value: string) => string,
+  userTemplate?: string,
 ): Promise<void> | null {
-  const template = process.env[CUSTOM_TERMINAL_ENV_VAR]?.trim() ?? "";
+  const template = userTemplate ?? process.env[CUSTOM_TERMINAL_ENV_VAR]?.trim()
+    ?? "";
   if (!template) {
     return null;
   }

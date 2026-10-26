@@ -8,6 +8,7 @@ import type {
   TrashEntryInfo,
   TrashRestoreItem,
 } from "../../shared/fs-types";
+import type { PlatformId } from "../../shared/platform/types";
 import { posixShellQuote, tryCustomTerminal } from "./custom-terminal";
 import { homeSubdirPlaces, isDirectory } from "./posix-places";
 import { openWithSystemDefault } from "./system-default-app";
@@ -18,7 +19,7 @@ import {
   statTrashEntry,
   trashRecordsByBasename,
 } from "./trash-common";
-import type { MainPlatform, MenuAcceleratorKey } from "./types";
+import type { MenuAcceleratorKey, TitlebarWindowOptions } from "./types";
 
 /**
  * Linux main-process platform implementation.
@@ -27,6 +28,9 @@ import type { MainPlatform, MenuAcceleratorKey } from "./types";
  * custom-terminal.ts) wins when set, then `$TERMINAL` (if it resolves to an
  * executable - a bare binary, spawned without a shell), otherwise the first
  * available binary from `DETECTION_ORDER`.
+ *
+ * The class object itself is the MainPlatform implementation (its static side
+ * satisfies the interface; conformance is type-checked in platform/index.ts).
  */
 
 /**
@@ -100,88 +104,6 @@ interface ResolvedTerminal {
   readonly bin: string;
   readonly cwdArgs: (dir: string) => string[];
 }
-
-/**
- * Picks a terminal binary:
- *  1. `$TERMINAL` when it resolves to an executable (known binaries get their
- *     directory flag; unknown ones are spawned bare so they inherit `cwd`),
- *  2. otherwise the first available binary from `DETECTION_ORDER`.
- */
-async function findTerminal(): Promise<ResolvedTerminal | undefined> {
-  const envTerminal = process.env.TERMINAL?.trim();
-  if (envTerminal) {
-    const bin = path.basename(envTerminal);
-    if (await resolveOnPath(envTerminal)) {
-      return KNOWN_TERMINALS[bin]
-        ?? { bin: envTerminal, cwdArgs: (): string[] => [] };
-    }
-  }
-
-  for (const bin of DETECTION_ORDER) {
-    if (await resolveOnPath(bin)) {
-      return KNOWN_TERMINALS[bin];
-    }
-  }
-
-  return undefined;
-}
-
-/** `true` if `bin` points at an executable file (absolute) or is on `$PATH`. */
-async function resolveOnPath(bin: string): Promise<boolean> {
-  if (bin.includes(path.sep)) {
-    return isExecutable(bin);
-  }
-
-  const pathDirs = (process.env.PATH ?? "").split(path.delimiter).filter(
-    Boolean,
-  );
-  for (const dir of pathDirs) {
-    if (await isExecutable(path.join(dir, bin))) {
-      return true;
-    }
-  }
-  return false;
-}
-
-async function isExecutable(file: string): Promise<boolean> {
-  try {
-    await fs.access(file, fs.constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function openInTerminal(dir: string): Promise<void> {
-  const st = await fs.stat(dir).catch((): undefined => undefined);
-  if (!st?.isDirectory()) {
-    throw new Error(`Cannot open terminal: "${dir}" is not a directory.`);
-  }
-
-  // User override via $XPLORER_TERMINAL wins over everything below
-  // (including the $TERMINAL variable).
-  const custom = tryCustomTerminal(dir, posixShellQuote);
-  if (custom) {
-    return custom;
-  }
-
-  const spec = await findTerminal();
-  if (!spec) {
-    throw new Error(
-      "No terminal emulator found. Install one of: "
-        + DETECTION_ORDER.join(", ")
-        + " (or set the $TERMINAL environment variable).",
-    );
-  }
-
-  spawn(spec.bin, spec.cwdArgs(dir), {
-    cwd: dir,
-    detached: true,
-    stdio: "ignore",
-  }).unref();
-}
-
-// ─── Open With (xdg-desktop-portal app chooser) ──────────────────────────────
 
 /**
  * Python/GLib helper that summons the DE-native "Select application" dialog
@@ -317,351 +239,453 @@ const NO_OPEN_WITH_DIALOG_MSG =
   "No native \"Open With\" dialog available on this system"
   + " (needs xdg-desktop-portal + python3-gobject/GLib).";
 
-/**
- * Runs the portal helper and waits for it to finish. The helper holds the
- * D-Bus connection the portal request lives on (dropping it cancels the
- * dialog), so this resolves when the user closes the dialog, not when the
- * dialog merely appears. User cancellation inside the dialog is not an
- * error.
- */
-async function openWithDialog(p: string): Promise<void> {
-  const st = await fs.stat(p).catch((): undefined => undefined);
-  if (!st) {
-    throw new Error(
-      `Cannot open the "Open With" dialog: "${p}" does not exist.`,
-    );
-  }
-
-  const status = await new Promise<string>((resolve, reject) => {
-    const proc = spawn(
-      "python3",
-      ["-c", OPEN_WITH_PORTAL_HELPER, p],
-      { stdio: ["ignore", "pipe", "pipe"] },
-    );
-    let stdout = "";
-    let stderr = "";
-    proc.stdout.on("data", (chunk) => (stdout += chunk));
-    proc.stderr.on("data", (chunk) => (stderr += chunk));
-    proc.on("error", (err) => {
-      reject(new Error(`${NO_OPEN_WITH_DIALOG_MSG} (python3: ${err.message})`));
-    });
-    proc.on("close", (code) => {
-      const lines = stdout.trim().split("\n").filter(Boolean);
-      const last = lines[lines.length - 1] ?? "";
-      if (last) {
-        resolve(last);
-        return;
-      }
-      reject(
-        new Error(
-          `${NO_OPEN_WITH_DIALOG_MSG} (helper exited with ${code}${
-            stderr.trim() ? `: ${stderr.trim()}` : ""
-          })`,
-        ),
-      );
-    });
-  });
-
-  if (status === "OK" || status === "CANCELLED" || status === "TIMEOUT") {
-    return;
-  }
-  if (status === "NO_GI") {
-    throw new Error(NO_OPEN_WITH_DIALOG_MSG + " (python3-gobject missing).");
-  }
-  throw new Error(
-    `${NO_OPEN_WITH_DIALOG_MSG} (${
-      status.startsWith("ERR ")
-        ? status.slice(4)
-        : `unexpected helper status "${status}"`
-    }).`,
-  );
-}
-
-/** Well-known user directories, plus the filesystem root. */
-async function getStaticPlaces(): Promise<PlaceInfo[]> {
-  const places = await homeSubdirPlaces([
-    { label: "Home", subpath: "" },
-    { label: "Desktop", subpath: "Desktop" },
-    { label: "Documents", subpath: "Documents" },
-    { label: "Downloads", subpath: "Downloads" },
-    { label: "Music", subpath: "Music" },
-    { label: "Pictures", subpath: "Pictures" },
-    { label: "Videos", subpath: "Videos" },
-  ]);
-
-  if (await isDirectory(path.sep)) {
-    places.push({ id: "filesystem-root", label: "Filesystem", path: path.sep });
-  }
-
-  return places;
-}
-
-function accelerator(key: MenuAcceleratorKey): string {
-  switch (key) {
-    case "new-window":
-      return "Ctrl+N";
-    case "new-tab":
-      return "Ctrl+T";
-    case "close-tab":
-      return "Ctrl+W";
-    case "refresh":
-      return "F5";
-    case "back":
-      return "Alt+Left";
-    case "forward":
-      return "Alt+Right";
-    case "up":
-      return "Alt+Up";
-    case "home":
-      return "Alt+Home";
-  }
-}
-
-// ─── Trash (FreeDesktop spec) ────────────────────────────────────────────────
-
-/**
- * The home trash: `$XDG_DATA_HOME/Trash` (default `~/.local/share/Trash`).
- * Contents live in `files/`, metadata in `info/<name>.trashinfo`. Per-drive
- * trashes (`.Trash-<uid>` on other mounts) are not read here - the home trash
- * is where `gio trash`/`shell.trashItem` put items deleted from the home
- * volume, which covers the app's usage.
- */
-function trashDir(): string {
-  return process.env.XDG_DATA_HOME
-    ? path.join(process.env.XDG_DATA_HOME, "Trash")
-    : path.join(os.homedir(), ".local", "share", "Trash");
-}
-
 interface TrashInfo {
   readonly originalPath: string | null;
   readonly deletionTime: number | null;
 }
 
-/**
- * `Path=` values are percent-encoded (URL escaping). Malformed escapes fall
- * back to the raw value.
- */
-function percentDecode(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
+export class LinuxPlatform {
+  static readonly id: PlatformId = "linux";
 
-/**
- * Parses a `[Trash Info]` file:
- *  - `Path=` is percent-encoded; absolute for home-trash entries (relative
- *    paths belong to per-drive trashes whose mount point is unknowable here,
- *    so they yield `null` and the item is listed as unrestorable),
- *  - `DeletionDate=` is a local-time ISO string without a zone
- *    (`2024-01-01T12:00:00`), which the ES spec's `Date.parse` reads as local
- *    time.
- */
-async function parseTrashInfo(file: string): Promise<TrashInfo> {
-  let originalPath: string | null = null;
-  let deletionTime: number | null = null;
-  try {
-    const content = await fs.readFile(file, "utf8");
-    for (const line of content.split(/\r?\n/)) {
-      const eq = line.indexOf("=");
-      if (eq === -1) {
-        continue;
-      }
-      const key = line.slice(0, eq).trim();
-      const value = line.slice(eq + 1).trim();
-      if (key === "Path") {
-        const decoded = percentDecode(value);
-        originalPath = path.isAbsolute(decoded) ? decoded : null;
-      } else if (key === "DeletionDate") {
-        const parsed = Date.parse(value);
-        deletionTime = Number.isNaN(parsed) ? null : parsed;
+  private static terminalTemplate: string | undefined = undefined;
+  static setTerminalTemplate(template: string | undefined) {
+    this.terminalTemplate = template;
+  }
+
+  /**
+   * Picks a terminal binary:
+   *  1. `$TERMINAL` when it resolves to an executable (known binaries get their
+   *     directory flag; unknown ones are spawned bare so they inherit `cwd`),
+   *  2. otherwise the first available binary from `DETECTION_ORDER`.
+   */
+  private static async findTerminal(): Promise<ResolvedTerminal | undefined> {
+    const envTerminal = process.env.TERMINAL?.trim();
+    if (envTerminal) {
+      const bin = path.basename(envTerminal);
+      if (await this.resolveOnPath(envTerminal)) {
+        return KNOWN_TERMINALS[bin]
+          ?? { bin: envTerminal, cwdArgs: (): string[] => [] };
       }
     }
-  } catch {
-    // Tolerated below via the null fields.
-  }
-  return { originalPath, deletionTime };
-}
 
-/**
- * Lists the home trash: every entry in `files/` becomes a TrashEntryInfo
- * whose `trashPath` is the real absolute path (so open/delete/copy work on
- * it unchanged). Original locations come from the authoritative `.trashinfo`
- * metadata, falling back to the app's sidecar records (e.g. when an item was
- * trashed without metadata); entries with neither list with `originalPath:
- * null`.
- */
-async function listTrash(): Promise<TrashEntryInfo[]> {
-  const trash = trashDir();
-  const filesDir = path.join(trash, "files");
-  const dirents = await fs.readdir(filesDir, { withFileTypes: true }).catch(
-    (): undefined => undefined,
-  );
-  if (!dirents) {
-    return [];
-  }
-
-  const liveNames = new Set(dirents.map((d) => d.name));
-
-  // [Trash Info] metadata, matched to entries by basename (minus .trashinfo).
-  const infos = new Map<string, TrashInfo>();
-  const infoEntries = await fs.readdir(path.join(trash, "info")).catch(
-    (): readonly string[] => [],
-  );
-  await Promise.all(
-    infoEntries.map(async (name) => {
-      if (!name.endsWith(".trashinfo")) {
-        return;
+    for (const bin of DETECTION_ORDER) {
+      if (await this.resolveOnPath(bin)) {
+        return KNOWN_TERMINALS[bin];
       }
-      infos.set(
-        name.slice(0, -".trashinfo".length),
-        await parseTrashInfo(path.join(trash, "info", name)),
-      );
-    }),
-  );
-
-  const records = await trashRecordsByBasename(liveNames);
-
-  return Promise.all(
-    dirents.map(async (dirent): Promise<TrashEntryInfo> => {
-      const trashPath = path.join(filesDir, dirent.name);
-      const st = await statTrashEntry(trashPath);
-      const info = infos.get(dirent.name);
-      const record = records.get(dirent.name);
-      return {
-        name: dirent.name,
-        trashPath,
-        originalPath: info?.originalPath ?? record?.originalPath ?? null,
-        deletionTime: info?.deletionTime ?? record?.trashedAt ?? null,
-        isDirectory: st ? st.isDirectory() : dirent.isDirectory(),
-        size: st?.size ?? 0,
-        mtimeMs: st?.mtimeMs ?? 0,
-      };
-    }),
-  );
-}
-
-/**
- * `.trashinfo` file backing a `files/` entry: `<trash>/files/<name>` is
- * described by `<trash>/info/<name>.trashinfo`.
- */
-function trashInfoFor(trashPath: string): string {
-  return path.join(
-    path.dirname(path.dirname(trashPath)),
-    "info",
-    `${path.basename(trashPath)}.trashinfo`,
-  );
-}
-
-/**
- * Restores items to their recorded original locations (parent directories
- * are created as needed, collisions get a numeric suffix, nothing is ever
- * overwritten). Per-item failures are collected and reported together; the
- * matching `.trashinfo` metadata is removed so no ghost entries remain.
- */
-async function restoreTrash(
-  items: ReadonlyArray<TrashRestoreItem>,
-): Promise<void> {
-  const failures: string[] = [];
-  for (const item of items) {
-    const name = path.basename(item.trashPath);
-    if (
-      !path.isAbsolute(item.trashPath) || !path.isAbsolute(item.originalPath)
-    ) {
-      failures.push(`${name}: not an absolute path`);
-      continue;
     }
+
+    return undefined;
+  }
+
+  /** `true` if `bin` points at an executable file (absolute) or is on `$PATH`. */
+  private static async resolveOnPath(bin: string): Promise<boolean> {
+    if (bin.includes(path.sep)) {
+      return this.isExecutable(bin);
+    }
+
+    const pathDirs = (process.env.PATH ?? "").split(path.delimiter).filter(
+      Boolean,
+    );
+    for (const dir of pathDirs) {
+      if (await this.isExecutable(path.join(dir, bin))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static async isExecutable(file: string): Promise<boolean> {
     try {
-      await restoreToOriginalLocation(item.trashPath, item.originalPath);
-      await fs.rm(trashInfoFor(item.trashPath), { force: true }).catch(
-        () => {},
+      await fs.access(file, fs.constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  static async openInTerminal(dir: string): Promise<void> {
+    const st = await fs.stat(dir).catch((): undefined => undefined);
+    if (!st?.isDirectory()) {
+      throw new Error(`Cannot open terminal: "${dir}" is not a directory.`);
+    }
+
+    // User override via $XPLORER_TERMINAL wins over everything below
+    // (including the $TERMINAL variable).
+    const custom = tryCustomTerminal(
+      dir,
+      posixShellQuote,
+      this.terminalTemplate,
+    );
+    if (custom) {
+      return custom;
+    }
+
+    const spec = await this.findTerminal();
+    if (!spec) {
+      throw new Error(
+        "No terminal emulator found. Install one of: "
+          + DETECTION_ORDER.join(", ")
+          + " (or set the $TERMINAL environment variable).",
       );
-    } catch (err) {
-      failures.push(`${name}: ${restoreErrMessage(err)}`);
     }
-  }
-  if (failures.length > 0) {
-    throw new Error(`Could not restore: ${failures.join("; ")}`);
-  }
-}
 
-/**
- * Empties the home trash permanently (FreeDesktop spec):
- *  - every entry of `files/` is deleted recursively (directories included),
- *  - the matching `info/<name>.trashinfo` metadata is removed with it (kept
- *    for entries whose deletion FAILED, so they stay listed/restorable),
- *  - `expunged/` — the spec's temporary storage for items another process is
- *    concurrently emptying — is cleared too (best-effort; the dir is optional
- *    and its absence is not an error).
- *
- * Per-item best-effort: one unremovable entry does not block the rest; the
- * collected failures are rejected as one aggregated error (same style as
- * `restoreTrash`). A missing trash directory is treated as already empty.
- */
-async function emptyTrash(): Promise<void> {
-  const trash = trashDir();
-  const filesDir = path.join(trash, "files");
+    spawn(spec.bin, spec.cwdArgs(dir), {
+      cwd: dir,
+      detached: true,
+      stdio: "ignore",
+    }).unref();
+  }
 
-  let dirents: Dirent[];
-  try {
-    dirents = await fs.readdir(filesDir, { withFileTypes: true });
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") {
-      return; // No trash (or no files/ dir): nothing to delete.
+  /**
+   * Runs the portal helper and waits for it to finish. The helper holds the
+   * D-Bus connection the portal request lives on (dropping it cancels the
+   * dialog), so this resolves when the user closes the dialog, not when the
+   * dialog merely appears. User cancellation inside the dialog is not an
+   * error.
+   */
+  static async openWithDialog(p: string): Promise<void> {
+    const st = await fs.stat(p).catch((): undefined => undefined);
+    if (!st) {
+      throw new Error(
+        `Cannot open the "Open With" dialog: "${p}" does not exist.`,
+      );
     }
-    // Anything else (e.g. EACCES) means the trash CANNOT be emptied.
+
+    const status = await new Promise<string>((resolve, reject) => {
+      const proc = spawn(
+        "python3",
+        ["-c", OPEN_WITH_PORTAL_HELPER, p],
+        { stdio: ["ignore", "pipe", "pipe"] },
+      );
+      let stdout = "";
+      let stderr = "";
+      proc.stdout.on("data", (chunk) => (stdout += chunk));
+      proc.stderr.on("data", (chunk) => (stderr += chunk));
+      proc.on("error", (err) => {
+        reject(
+          new Error(`${NO_OPEN_WITH_DIALOG_MSG} (python3: ${err.message})`),
+        );
+      });
+      proc.on("close", (code) => {
+        const lines = stdout.trim().split("\n").filter(Boolean);
+        const last = lines[lines.length - 1] ?? "";
+        if (last) {
+          resolve(last);
+          return;
+        }
+        reject(
+          new Error(
+            `${NO_OPEN_WITH_DIALOG_MSG} (helper exited with ${code}${
+              stderr.trim() ? `: ${stderr.trim()}` : ""
+            })`,
+          ),
+        );
+      });
+    });
+
+    if (status === "OK" || status === "CANCELLED" || status === "TIMEOUT") {
+      return;
+    }
+    if (status === "NO_GI") {
+      throw new Error(NO_OPEN_WITH_DIALOG_MSG + " (python3-gobject missing).");
+    }
     throw new Error(
-      `Could not empty the trash: cannot read "${filesDir}": ${
-        restoreErrMessage(err)
-      }`,
+      `${NO_OPEN_WITH_DIALOG_MSG} (${
+        status.startsWith("ERR ")
+          ? status.slice(4)
+          : `unexpected helper status "${status}"`
+      }).`,
     );
   }
 
-  const failures: string[] = [];
-  for (const dirent of dirents) {
-    const entryPath = path.join(filesDir, dirent.name);
-    try {
-      await fs.rm(entryPath, { recursive: true, force: true });
-      // The metadata goes with the item; a leftover would be a ghost entry.
-      await fs.rm(trashInfoFor(entryPath), { force: true }).catch(() => {});
-    } catch (err) {
-      failures.push(`${dirent.name}: ${restoreErrMessage(err)}`);
+  static openPath(p: string): Promise<void> {
+    return openWithSystemDefault(p);
+  }
+
+  /** Well-known user directories, plus the filesystem root. */
+  static async getStaticPlaces(): Promise<PlaceInfo[]> {
+    const places = await homeSubdirPlaces([
+      { label: "Home", subpath: "" },
+      { label: "Desktop", subpath: "Desktop" },
+      { label: "Documents", subpath: "Documents" },
+      { label: "Downloads", subpath: "Downloads" },
+      { label: "Music", subpath: "Music" },
+      { label: "Pictures", subpath: "Pictures" },
+      { label: "Videos", subpath: "Videos" },
+    ]);
+
+    if (await isDirectory(path.sep)) {
+      places.push({
+        id: "filesystem-root",
+        label: "Filesystem",
+        path: path.sep,
+      });
+    }
+
+    return places;
+  }
+
+  static accelerator(key: MenuAcceleratorKey): string {
+    switch (key) {
+      case "new-window":
+        return "Ctrl+N";
+      case "new-tab":
+        return "Ctrl+T";
+      case "close-tab":
+        return "Ctrl+W";
+      case "refresh":
+        return "F5";
+      case "back":
+        return "Alt+Left";
+      case "forward":
+        return "Alt+Right";
+      case "up":
+        return "Alt+Up";
+      case "home":
+        return "Alt+Home";
     }
   }
 
-  await removeDirEntries(path.join(trash, "expunged"), failures);
-
-  if (failures.length > 0) {
-    throw new Error(`Could not empty the trash: ${failures.join("; ")}`);
+  /**
+   * The home trash: `$XDG_DATA_HOME/Trash` (default `~/.local/share/Trash`).
+   * Contents live in `files/`, metadata in `info/<name>.trashinfo`. Per-drive
+   * trashes (`.Trash-<uid>` on other mounts) are not read here - the home trash
+   * is where `gio trash`/`shell.trashItem` put items deleted from the home
+   * volume, which covers the app's usage.
+   */
+  private static trashDir(): string {
+    return process.env.XDG_DATA_HOME
+      ? path.join(process.env.XDG_DATA_HOME, "Trash")
+      : path.join(os.homedir(), ".local", "share", "Trash");
   }
-}
 
-/** Linux main-process platform implementation. */
-export function createLinuxPlatform(): MainPlatform {
-  return {
-    id: "linux",
-    getStaticPlaces,
-    openPath: openWithSystemDefault,
-    openInTerminal,
-    openWithDialog,
-    isValidAbsolutePath: (p) => path.isAbsolute(p),
-    // POSIX xmedia URLs are the native path verbatim (the empty-authority
-    // URL form `xmedia:///abs/path` decodes to `/abs/path`).
-    protocolPathToAbsolute: (p) => {
-      if (!path.isAbsolute(p)) {
-        throw new Error(`not a valid absolute POSIX path: "${p}"`);
+  /**
+   * `Path=` values are percent-encoded (URL escaping). Malformed escapes fall
+   * back to the raw value.
+   */
+  private static percentDecode(value: string): string {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+
+  /**
+   * Parses a `[Trash Info]` file:
+   *  - `Path=` is percent-encoded; absolute for home-trash entries (relative
+   *    paths belong to per-drive trashes whose mount point is unknowable here,
+   *    so they yield `null` and the item is listed as unrestorable),
+   *  - `DeletionDate=` is a local-time ISO string without a zone
+   *    (`2024-01-01T12:00:00`), which the ES spec's `Date.parse` reads as local
+   *    time.
+   */
+  private static async parseTrashInfo(file: string): Promise<TrashInfo> {
+    let originalPath: string | null = null;
+    let deletionTime: number | null = null;
+    try {
+      const content = await fs.readFile(file, "utf8");
+      for (const line of content.split(/\r?\n/)) {
+        const eq = line.indexOf("=");
+        if (eq === -1) {
+          continue;
+        }
+        const key = line.slice(0, eq).trim();
+        const value = line.slice(eq + 1).trim();
+        if (key === "Path") {
+          const decoded = this.percentDecode(value);
+          originalPath = path.isAbsolute(decoded) ? decoded : null;
+        } else if (key === "DeletionDate") {
+          const parsed = Date.parse(value);
+          deletionTime = Number.isNaN(parsed) ? null : parsed;
+        }
       }
-      return p;
-    },
-    accelerator,
-    usesAppMenu: () => false,
-    quitAfterAllWindowsClosed: () => true,
-    // No native window decorations left at all: the titlebar renders its own
-    // window-control buttons (right side).
-    titlebarWindowOptions: () => ({ frame: false }),
-    listTrash,
-    restoreTrash,
-    emptyTrash,
-  };
+    } catch {
+      // Tolerated below via the null fields.
+    }
+    return { originalPath, deletionTime };
+  }
+
+  /**
+   * Lists the home trash: every entry in `files/` becomes a TrashEntryInfo
+   * whose `trashPath` is the real absolute path (so open/delete/copy work on
+   * it unchanged). Original locations come from the authoritative `.trashinfo`
+   * metadata, falling back to the app's sidecar records (e.g. when an item was
+   * trashed without metadata); entries with neither list with `originalPath:
+   * null`.
+   */
+  static async listTrash(): Promise<TrashEntryInfo[]> {
+    const trash = this.trashDir();
+    const filesDir = path.join(trash, "files");
+    const dirents = await fs.readdir(filesDir, { withFileTypes: true }).catch(
+      (): undefined => undefined,
+    );
+    if (!dirents) {
+      return [];
+    }
+
+    const liveNames = new Set(dirents.map((d) => d.name));
+
+    // [Trash Info] metadata, matched to entries by basename (minus .trashinfo).
+    const infos = new Map<string, TrashInfo>();
+    const infoEntries = await fs.readdir(path.join(trash, "info")).catch(
+      (): readonly string[] => [],
+    );
+    await Promise.all(
+      infoEntries.map(async (name) => {
+        if (!name.endsWith(".trashinfo")) {
+          return;
+        }
+        infos.set(
+          name.slice(0, -".trashinfo".length),
+          await this.parseTrashInfo(path.join(trash, "info", name)),
+        );
+      }),
+    );
+
+    const records = await trashRecordsByBasename(liveNames);
+
+    return Promise.all(
+      dirents.map(async (dirent): Promise<TrashEntryInfo> => {
+        const trashPath = path.join(filesDir, dirent.name);
+        const st = await statTrashEntry(trashPath);
+        const info = infos.get(dirent.name);
+        const record = records.get(dirent.name);
+        return {
+          name: dirent.name,
+          trashPath,
+          originalPath: info?.originalPath ?? record?.originalPath ?? null,
+          deletionTime: info?.deletionTime ?? record?.trashedAt ?? null,
+          isDirectory: st ? st.isDirectory() : dirent.isDirectory(),
+          size: st?.size ?? 0,
+          mtimeMs: st?.mtimeMs ?? 0,
+        };
+      }),
+    );
+  }
+
+  /**
+   * `.trashinfo` file backing a `files/` entry: `<trash>/files/<name>` is
+   * described by `<trash>/info/<name>.trashinfo`.
+   */
+  private static trashInfoFor(trashPath: string): string {
+    return path.join(
+      path.dirname(path.dirname(trashPath)),
+      "info",
+      `${path.basename(trashPath)}.trashinfo`,
+    );
+  }
+
+  /**
+   * Restores items to their recorded original locations (parent directories
+   * are created as needed, collisions get a numeric suffix, nothing is ever
+   * overwritten). Per-item failures are collected and reported together; the
+   * matching `.trashinfo` metadata is removed so no ghost entries remain.
+   */
+  static async restoreTrash(
+    items: ReadonlyArray<TrashRestoreItem>,
+  ): Promise<void> {
+    const failures: string[] = [];
+    for (const item of items) {
+      const name = path.basename(item.trashPath);
+      if (
+        !path.isAbsolute(item.trashPath) || !path.isAbsolute(item.originalPath)
+      ) {
+        failures.push(`${name}: not an absolute path`);
+        continue;
+      }
+      try {
+        await restoreToOriginalLocation(item.trashPath, item.originalPath);
+        await fs.rm(this.trashInfoFor(item.trashPath), { force: true }).catch(
+          () => {},
+        );
+      } catch (err) {
+        failures.push(`${name}: ${restoreErrMessage(err)}`);
+      }
+    }
+    if (failures.length > 0) {
+      throw new Error(`Could not restore: ${failures.join("; ")}`);
+    }
+  }
+
+  /**
+   * Empties the home trash permanently (FreeDesktop spec):
+   *  - every entry of `files/` is deleted recursively (directories included),
+   *  - the matching `info/<name>.trashinfo` metadata is removed with it (kept
+   *    for entries whose deletion FAILED, so they stay listed/restorable),
+   *  - `expunged/` — the spec's temporary storage for items another process is
+   *    concurrently emptying — is cleared too (best-effort; the dir is optional
+   *    and its absence is not an error).
+   *
+   * Per-item best-effort: one unremovable entry does not block the rest; the
+   * collected failures are rejected as one aggregated error (same style as
+   * `restoreTrash`). A missing trash directory is treated as already empty.
+   */
+  static async emptyTrash(): Promise<void> {
+    const trash = this.trashDir();
+    const filesDir = path.join(trash, "files");
+
+    let dirents: Dirent[];
+    try {
+      dirents = await fs.readdir(filesDir, { withFileTypes: true });
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") {
+        return; // No trash (or no files/ dir): nothing to delete.
+      }
+      // Anything else (e.g. EACCES) means the trash CANNOT be emptied.
+      throw new Error(
+        `Could not empty the trash: cannot read "${filesDir}": ${
+          restoreErrMessage(err)
+        }`,
+      );
+    }
+
+    const failures: string[] = [];
+    for (const dirent of dirents) {
+      const entryPath = path.join(filesDir, dirent.name);
+      try {
+        await fs.rm(entryPath, { recursive: true, force: true });
+        // The metadata goes with the item; a leftover would be a ghost entry.
+        await fs.rm(this.trashInfoFor(entryPath), { force: true }).catch(
+          () => {},
+        );
+      } catch (err) {
+        failures.push(`${dirent.name}: ${restoreErrMessage(err)}`);
+      }
+    }
+
+    await removeDirEntries(path.join(trash, "expunged"), failures);
+
+    if (failures.length > 0) {
+      throw new Error(`Could not empty the trash: ${failures.join("; ")}`);
+    }
+  }
+
+  // POSIX: absolute = leading "/".
+  static isValidAbsolutePath(p: string): boolean {
+    return path.isAbsolute(p);
+  }
+
+  // POSIX xmedia URLs are the native path verbatim (the empty-authority
+  // URL form `xmedia:///abs/path` decodes to `/abs/path`).
+  static protocolPathToAbsolute(p: string): string {
+    if (!path.isAbsolute(p)) {
+      throw new Error(`not a valid absolute POSIX path: "${p}"`);
+    }
+    return p;
+  }
+
+  static usesAppMenu(): boolean {
+    return false;
+  }
+
+  static quitAfterAllWindowsClosed(): boolean {
+    return true;
+  }
+
+  // No native window decorations left at all: the titlebar renders its own
+  // window-control buttons (right side).
+  static titlebarWindowOptions(): TitlebarWindowOptions {
+    return { frame: false };
+  }
 }

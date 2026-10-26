@@ -22,6 +22,7 @@ export interface MainPlatform {
    * otherwise the OS default. Rejects with the launch error description.
    */
   openPath(p: string): Promise<void>;
+  setTerminalTemplate(template: string | undefined): void;
   /** Opens the platform's terminal emulator in the given directory. */
   openInTerminal(dir: string): Promise<void>;
   /**

@@ -1,4 +1,9 @@
-import { Explorer, Immediate, Path } from "@ncpa0cpl/fs-explorer";
+import {
+  Explorer,
+  Immediate,
+  Path,
+  PreferencePages,
+} from "@ncpa0cpl/fs-explorer";
 import type { PlaceInfo } from "../shared/fs-types";
 import { createPlatform } from "../shared/platform/types";
 import {
@@ -21,6 +26,7 @@ const dndApi = window.xplorer;
  */
 export async function bootstrap(): Promise<void> {
   try {
+    const termTemp = localStorage.getItem("term-template");
     // Platform identity comes from the main process (never detected here);
     // the shared `createPlatform` switch is the renderer's only platform
     // conditional. Everything downstream (fs adapter, actions, drag-out,
@@ -66,6 +72,17 @@ export async function bootstrap(): Promise<void> {
       // OS drag-out: hands an in-progress emulated drag to the OS when the
       // pointer leaves the window (see drag-out.ts for the hybrid model).
       nativeDragOut: nativeDragOutHandler,
+      customPreferences: [{
+        category: PreferencePages.Advanced,
+        label: "Terminal",
+        type: "input",
+        placeholder: "e.g. konsole --workdir {dir}",
+        defaultValue: termTemp ?? undefined,
+        onChange(template, ctx) {
+          window.xplorer.setTerminal(template);
+          ctx.storage.setItem("term-template", template);
+        },
+      }],
     });
 
     for (const folder of extraLaunchFolders) {
@@ -101,6 +118,10 @@ export async function bootstrap(): Promise<void> {
 
     shell.appendChild(explorerHost);
     document.body.appendChild(shell);
+
+    if (termTemp) {
+      window.xplorer.setTerminal(termTemp);
+    }
   } catch (err) {
     // Startup must not fail silently: log loudly and surface the error in the
     // window so failed IPC/bridge wiring is visible in screenshots too.
@@ -163,10 +184,8 @@ function setupMenuCommands(explorer: Explorer, homeDir: string): void {
       }
       case "close-tab": {
         // Never leave zero tabs: ignore the command on the last one.
-        const tabs = explorer.tabs.get();
-        if (tabs.length > 1) {
-          explorer.closeTab(explorer.activeTab.get());
-        }
+        const tab = explorer.currentTab;
+        explorer.closeTab(tab.get().id);
         break;
       }
       case "refresh": {

@@ -81,14 +81,14 @@ const mainBridge = await compile(
       path.join(projectRoot, "src/main/platform/index.ts"),
     )
   };
-import { createWin32MainPlatform } from ${
+import { Win32Platform } from ${
     JSON.stringify(
       path.join(projectRoot, "src/main/platform/win32.ts"),
     )
   };
-export { getMainPlatform, createWin32MainPlatform };`,
+export { getMainPlatform, Win32Platform };`,
 );
-const { getMainPlatform, createWin32MainPlatform } = mainBridge;
+const { getMainPlatform, Win32Platform } = mainBridge;
 
 const posix = createPlatform("linux");
 const darwin = createPlatform("darwin");
@@ -368,7 +368,7 @@ check("app menu + quit policy", () => {
 });
 
 console.log("\nwin32 main bridge (exercised directly; no Windows needed)");
-const win32Main = createWin32MainPlatform();
+const win32Main = Win32Platform;
 check(
   "win32 validation: drives and UNC accepted, POSIX-relative rejected",
   () => {

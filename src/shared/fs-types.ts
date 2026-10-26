@@ -89,6 +89,7 @@ export interface SystemApi {
    * default. Rejects with the launch error description.
    */
   openPath(path: string): Promise<void>;
+  setTerminal(template: string): Promise<void>;
   /** Opens a terminal emulator with the given directory as cwd. */
   openInTerminal(path: string): Promise<void>;
   /**

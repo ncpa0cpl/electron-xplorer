@@ -7,8 +7,8 @@
       "dependencies": {
         "@ncpa0cpl/fs-explorer": "^1.0.3",
         "@ncpa0cpl/vanilla-jsx": "^0.0.1-alpha.54",
-        "adwavecss": "^0.2.6",
-        "adwaveui": "^0.3.2",
+        "adwavecss": "^0.4.1",
+        "adwaveui": "^0.4.1",
         "async-await-queue": "^2.1.4",
         "electron-squirrel-startup": "^1.0.1",
         "ffmpeg-static": "^5.3.0",
@@ -342,9 +342,9 @@
 
     "acorn-jsx": ["acorn-jsx@5.3.2", "", {}, "sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ=="],
 
-    "adwavecss": ["adwavecss@0.2.6", "", {}, "sha512-6k1boSCjcYJe31+9BocXULyNX7GTsZgvA48ulrHW7/6UpAAf1KwlY1CNaxR2s1DPd61dVyixDndr7Tn89r7GPQ=="],
+    "adwavecss": ["adwavecss@0.4.1", "", {}, "sha512-tUfysjU7Rgk2AoOWPoSApLjkUMXAgoSUCl4HqpnFn/QzoMn5ANJ868aGJgQuQ29Cugz7F9kavP6Ls6Tr5CUD3A=="],
 
-    "adwaveui": ["adwaveui@0.3.2", "", { "dependencies": { "@ncpa0cpl/vanilla-jsx": "0.0.1-alpha.44", "adwavecss": ">=0.2.6", "wc_toolkit": "^0.1.2" } }, "sha512-BlcaJXqJH/j+rXINMmWd2YUzgJnwA3jvUejpc0R+7N3/1LY9AoIT3+OBAggjW3SBnhzNkKZhra6NVG/+3Oqjfw=="],
+    "adwaveui": ["adwaveui@0.4.1", "", { "dependencies": { "@ncpa0cpl/vanilla-jsx": "0.0.1-alpha.54", "adwavecss": ">=0.4.0", "wc_toolkit": "^0.1.4" } }, "sha512-xtXxLKeYtjci+J4/xMWZpYKBCwi9IfqTgxLiiHy1ptzUcFF61y9z11DASshChkakjsCwj1FW6N+KL0D0qgK6Ag=="],
 
     "agent-base": ["agent-base@6.0.2", "", { "dependencies": { "debug": "4" } }, "sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ=="],
 
@@ -1106,7 +1106,7 @@
 
     "vite": ["vite@8.3.2", "", { "dependencies": { "lightningcss": "^1.33.0", "picomatch": "^4.0.7", "postcss": "^8.5.28", "rolldown": "~1.2.11", "tinyglobby": "^0.2.17" }, "optionalDependencies": { "fsevents": "~2.3.3" }, "peerDependencies": { "@types/node": "^20.19.0 || >=22.12.0", "@vitejs/devtools": "^0.7.1", "esbuild": "^0.27.0 || ^0.28.0", "jiti": ">=1.21.0", "less": "^4.0.0", "sass": "^1.70.0", "sass-embedded": "^1.70.0", "stylus": ">=0.54.8", "sugarss": "^5.0.0", "terser": "^5.16.0", "tsx": "^4.8.1", "yaml": "^2.4.2" }, "optionalPeers": ["@types/node", "@vitejs/devtools", "esbuild", "jiti", "less", "sass", "sass-embedded", "stylus", "sugarss", "terser", "tsx", "yaml"], "bin": { "vite": "bin/vite.js" } }, "sha512-SQr1x6W5vVSbROg7vsyXIaxK9b0G7zsT68acdWWRmnBUsgDieLCRG+Rep9WdZgcposvv/GSnr4GUUBqB3vXq6w=="],
 
-    "wc_toolkit": ["wc_toolkit@0.1.2", "", {}, "sha512-L9UDOlos4Kevk4nHyCCsI70yd1LwJh7TjqmpSQNNIbMCSZ1uMdI7QCtQu4IN6SdNBjOHMxizRp7y0jKdeJmguA=="],
+    "wc_toolkit": ["wc_toolkit@0.1.4", "", {}, "sha512-PfkpjiUntdaY4yiFVB75OE6wOGwQAKmWvvrvPrpSQZElgExMywhRet1nH31ZvFRVzW797IqdZRP6J46ar9RZsw=="],
 
     "which": ["which@1.3.1", "", { "dependencies": { "isexe": "^2.0.0" }, "bin": { "which": "./bin/which" } }, "sha512-HxJdYWq1MTIQbJ3nw0cqssHoTNU267KlrDuGZ1WYlxDStUtKUhOaJmh112/TZmHxxUfuJqPXSOm7tDyas0OSIQ=="],
 
@@ -1162,9 +1162,13 @@
 
     "@emnapi/runtime/tslib": ["tslib@2.8.1", "", {}, "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="],
 
+    "@ncpa0cpl/fs-explorer/adwavecss": ["adwavecss@0.2.6", "", {}, "sha512-6k1boSCjcYJe31+9BocXULyNX7GTsZgvA48ulrHW7/6UpAAf1KwlY1CNaxR2s1DPd61dVyixDndr7Tn89r7GPQ=="],
+
     "@ncpa0cpl/fs-explorer/adwaveui": ["adwaveui@0.2.4", "", { "dependencies": { "@ncpa0cpl/vanilla-jsx": "0.0.1-alpha.44", "adwavecss": ">=0.2.1", "wc_toolkit": "^0.1.1" } }, "sha512-srcQv2p3Qrsaw7vbOXEJk0t796HRkGaVCmRepyDe8B8Jh8/r8iCht1XYR64wUukG3ds2as+gP1RkYfFRxXBxpQ=="],
 
     "@typescript-eslint/utils/eslint-scope": ["eslint-scope@5.1.1", "", { "dependencies": { "esrecurse": "^4.3.0", "estraverse": "^4.1.1" } }, "sha512-2NxwbF/hZ0KpepYN0cNbo+FN6XoK7GaHlQhgx/hIZl6Va0bF45RQOOwhLIy8lQDbuCiadSLCBnH2CFYquit5bw=="],
+
+    "adwaveui/adwavecss": ["adwavecss@0.4.0", "", {}, "sha512-VSCHVgT3si0R0q3wUhiupe/zZDBGDQQc9K0VGPEG5yCZGhLWpTLgB0elRms71cTV9PyJ+DQtU7Xw6zGfsGc2sQ=="],
 
     "appdmg/async": ["async@1.5.2", "", {}, "sha512-nSVgobk4rv61R9PUSDtYt7mPVB2olxNR5RWJcAsH676/ef11bUZwvu7+RGYrYauVdDPcO519v68wRhXQtxsV9w=="],
 
@@ -1253,6 +1257,8 @@
     "@electron/windows-sign/fs-extra/jsonfile": ["jsonfile@6.2.1", "", { "dependencies": { "universalify": "^2.0.0" }, "optionalDependencies": { "graceful-fs": "^4.1.6" } }, "sha512-zwOTdL3rFQ/lRdBnntKVOX6k5cKJwEc1HdilT71BWEu7J41gXIB2MRp+vxduPSwZJPWBxEzv4yH1wYLJGUHX4Q=="],
 
     "@electron/windows-sign/fs-extra/universalify": ["universalify@2.0.1", "", {}, "sha512-gptHNQghINnc/vTGIk0SOFGFNXw7JVrlRUtConJRlvaw6DuX0wO5Jeko9sWrMBhh+PsYAZ7oXAiOnf/UKogyiw=="],
+
+    "@ncpa0cpl/fs-explorer/adwaveui/wc_toolkit": ["wc_toolkit@0.1.2", "", {}, "sha512-L9UDOlos4Kevk4nHyCCsI70yd1LwJh7TjqmpSQNNIbMCSZ1uMdI7QCtQu4IN6SdNBjOHMxizRp7y0jKdeJmguA=="],
 
     "@typescript-eslint/utils/eslint-scope/estraverse": ["estraverse@4.3.0", "", {}, "sha512-39nnKffWz8xN1BU/2c79n9nB9HDzo0niYUqx6xyqUnyoAnQyyWpOTdZEeiCch8BBu515t4wp9ZmgVfVhn9EBpw=="],
 

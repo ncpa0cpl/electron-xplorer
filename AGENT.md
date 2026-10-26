@@ -81,7 +81,7 @@ src/renderer/
 
 ## Platform abstraction (the one-switch rule)
 
-- Main: the ONLY `process.platform` switch is `getMainPlatform()` in `src/main/platform/index.ts` → one of `linux.ts` / `darwin.ts` / `win32.ts` / `unknown.ts`, all implementing `MainPlatform` (`platform/types.ts`). Current interface: `getStaticPlaces`, `openPath`, `openInTerminal`, `openWithDialog`, `listTrash`, `restoreTrash`, `emptyTrash`, `isValidAbsolutePath`, `protocolPathToAbsolute`, `accelerator`, `usesAppMenu`, `quitAfterAllWindowsClosed`, `titlebarWindowOptions`.
+- Main: the ONLY `process.platform` switch is `getMainPlatform()` in `src/main/platform/index.ts` → one of `linux.ts` / `darwin.ts` / `win32.ts` / `unknown.ts`, static classes whose static side implements `MainPlatform` (`platform/types.ts`). Current interface: `getStaticPlaces`, `openPath`, `openInTerminal`, `openWithDialog`, `listTrash`, `restoreTrash`, `emptyTrash`, `isValidAbsolutePath`, `protocolPathToAbsolute`, `accelerator`, `usesAppMenu`, `quitAfterAllWindowsClosed`, `titlebarWindowOptions`.
 - Renderer: platform crosses IPC exactly once (`system:getPlatformInfo`); all path/hidden-name logic goes through the pure `Platform` from `src/shared/platform/`. No `process.platform` in renderer code.
 - Adding platform behavior = extend `MainPlatform` + implement in all four files (`unknown.ts` rejects or no-ops). See README "Adding a platform".
 

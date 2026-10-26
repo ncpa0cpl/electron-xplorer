@@ -13,6 +13,8 @@ export const systemApi: SystemApi = {
   openPath: (p) => ipcRenderer.invoke("system:openPath", p) as Promise<void>,
   openInTerminal: (p) =>
     ipcRenderer.invoke("system:openInTerminal", p) as Promise<void>,
+  setTerminal: (p) =>
+    ipcRenderer.invoke("system:setTerminal", p) as Promise<void>,
   openWith: (p) => ipcRenderer.invoke("system:openWith", p) as Promise<void>,
   getPlatformInfo: () =>
     ipcRenderer.invoke("system:getPlatformInfo") as Promise<PlatformId>,

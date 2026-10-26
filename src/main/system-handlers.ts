@@ -21,6 +21,7 @@ export function registerSystemHandlers(): void {
   handle("system:getStaticPlaces", [], getStaticPlaces);
   handle("system:openPath", ["path"], openPath);
   handle("system:openInTerminal", ["path"], openInTerminalHandler);
+  handle("system:setTerminal", ["string"], setTerminal);
   handle("system:openWith", ["path"], openWithHandler);
   /**
    * Returns the platform id the renderer needs to build its shared `Platform`
@@ -65,6 +66,11 @@ async function openPath(p: string): Promise<void> {
 /** Opens a terminal emulator with the given directory as cwd (per platform). */
 async function openInTerminalHandler(p: string): Promise<void> {
   await getMainPlatform().openInTerminal(p);
+}
+
+/** Opens a terminal emulator with the given directory as cwd (per platform). */
+function setTerminal(p: string): void {
+  getMainPlatform().setTerminalTemplate(p);
 }
 
 /**

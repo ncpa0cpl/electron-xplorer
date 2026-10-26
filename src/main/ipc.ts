@@ -36,6 +36,16 @@ export function handle(
 ): void;
 export function handle(
   channel: string,
+  spec: readonly ["string"],
+  fn: (a: string) => unknown,
+): void;
+export function handle(
+  channel: string,
+  spec: readonly ("string" | "path")[],
+  fn: (...args: any[]) => unknown,
+): void;
+export function handle(
+  channel: string,
   spec: readonly string[],
   fn: (...args: never[]) => unknown,
 ): void {
@@ -49,6 +59,8 @@ export function handle(
     const validated = args.map((arg, i) => {
       const kind = spec[i] as string | undefined;
       switch (kind) {
+        case "string":
+          return validateString(channel, i, arg);
         case "path":
           return validatePath(channel, i, arg);
         default:
@@ -58,6 +70,15 @@ export function handle(
 
     return (fn as (...args: unknown[]) => unknown)(...validated);
   });
+}
+
+function validateString(channel: string, index: number, arg: unknown): string {
+  if (typeof arg !== "string") {
+    throw new Error(
+      `IPC ${channel}: argument #${index} must be a string`,
+    );
+  }
+  return arg;
 }
 
 function validatePath(channel: string, index: number, arg: unknown): string {
