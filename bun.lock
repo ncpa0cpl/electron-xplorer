@@ -5,8 +5,8 @@
     "": {
       "name": "electron-xplorer",
       "dependencies": {
-        "@ncpa0cpl/fs-explorer": "^1.0.3",
-        "@ncpa0cpl/vanilla-jsx": "^0.0.1-alpha.54",
+        "@ncpa0cpl/fs-explorer": "^1.2.0",
+        "@ncpa0cpl/vanilla-jsx": "^0.0.1-alpha.56",
         "adwavecss": "^0.4.1",
         "adwaveui": "^0.4.1",
         "async-await-queue": "^2.1.4",
@@ -45,7 +45,7 @@
     },
   },
   "overrides": {
-    "@ncpa0cpl/vanilla-jsx": "^0.0.1-alpha.54",
+    "@ncpa0cpl/vanilla-jsx": "^0.0.1-alpha.56",
   },
   "packages": {
     "@alcalzone/ansi-tokenize": ["@alcalzone/ansi-tokenize@0.3.1", "", { "dependencies": { "ansi-styles": "^6.2.1", "is-fullwidth-code-point": "^5.0.0" } }, "sha512-cUD0PT0YX+rImRhfn7BfMRduP/tX/Zqt/N0dHlAyn2RlcJssCb5KsCJkhln61eh9vuJDkH8wKn3L8zJzzWXPFg=="],
@@ -208,9 +208,9 @@
 
     "@malept/cross-spawn-promise": ["@malept/cross-spawn-promise@2.0.0", "", { "dependencies": { "cross-spawn": "^7.0.1" } }, "sha512-1DpKU0Z5ThltBwjNySMC14g0CkbyhCaz9FkhxqNsZI6uAPJXFS8cMXlBKo26FJ8ZuW6S9GCMcR9IO5k2X5/9Fg=="],
 
-    "@ncpa0cpl/fs-explorer": ["@ncpa0cpl/fs-explorer@1.0.3", "", { "dependencies": { "@ncpa0cpl/vanilla-jsx": "^0.0.1-alpha.54", "adwavecss": "^0.2.5", "adwaveui": "^0.2.1", "async-await-queue": "^2.1.4", "lodash.throttle": "^4.1.1", "luxon": "^3.7.2" }, "peerDependencies": { "typescript": "^5.9.3" } }, "sha512-38qwyXtrA1IId37dA4+XVQlQqRYUS5qjlKlc7fLgPSRf0cb1LQd8EGDSV2Z3cy4cUC+Rw6hKxYlAeBuVkPx2qw=="],
+    "@ncpa0cpl/fs-explorer": ["@ncpa0cpl/fs-explorer@1.2.0", "", { "dependencies": { "@ncpa0cpl/vanilla-jsx": "^0.0.1-alpha.56", "adwavecss": "^0.4.1", "adwaveui": "^0.4.1", "async-await-queue": "^2.1.4", "lodash.throttle": "^4.1.1", "luxon": "^3.7.2" }, "peerDependencies": { "typescript": "^5.9.3" } }, "sha512-zdH7LO66e73neDUdoI4IdJeTydgRNqqhadQXlZnXWACdSEpR0/VljHfpiaPQdk1BIpySTWWlUkXWjHLBZ5KY3w=="],
 
-    "@ncpa0cpl/vanilla-jsx": ["@ncpa0cpl/vanilla-jsx@0.0.1-alpha.54", "", { "dependencies": { "html-element-attributes": "^3.4.0", "immer": "^10.1.1" } }, "sha512-ij5zmn33EUVxz2OrtfCZxBdS3LGyXa1sLE6Tul3EFv1YDSWLwQcKCieoX2iTqQtnJWLju1oVoG+c38r6OYplAQ=="],
+    "@ncpa0cpl/vanilla-jsx": ["@ncpa0cpl/vanilla-jsx@0.0.1-alpha.56", "", { "dependencies": { "html-element-attributes": "^3.4.0", "immer": "^10.1.1" } }, "sha512-udCpepJchXkA44qqFCyrPj4ZsqhBX4FR10a2LmGoWOu7NqlEr/exxCO9o30NS4/rigD/90HjGo0rg34F1gAqVw=="],
 
     "@nodelib/fs.scandir": ["@nodelib/fs.scandir@2.1.5", "", { "dependencies": { "@nodelib/fs.stat": "2.0.5", "run-parallel": "^1.1.9" } }, "sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g=="],
 
@@ -1162,10 +1162,6 @@
 
     "@emnapi/runtime/tslib": ["tslib@2.8.1", "", {}, "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="],
 
-    "@ncpa0cpl/fs-explorer/adwavecss": ["adwavecss@0.2.6", "", {}, "sha512-6k1boSCjcYJe31+9BocXULyNX7GTsZgvA48ulrHW7/6UpAAf1KwlY1CNaxR2s1DPd61dVyixDndr7Tn89r7GPQ=="],
-
-    "@ncpa0cpl/fs-explorer/adwaveui": ["adwaveui@0.2.4", "", { "dependencies": { "@ncpa0cpl/vanilla-jsx": "0.0.1-alpha.44", "adwavecss": ">=0.2.1", "wc_toolkit": "^0.1.1" } }, "sha512-srcQv2p3Qrsaw7vbOXEJk0t796HRkGaVCmRepyDe8B8Jh8/r8iCht1XYR64wUukG3ds2as+gP1RkYfFRxXBxpQ=="],
-
     "@typescript-eslint/utils/eslint-scope": ["eslint-scope@5.1.1", "", { "dependencies": { "esrecurse": "^4.3.0", "estraverse": "^4.1.1" } }, "sha512-2NxwbF/hZ0KpepYN0cNbo+FN6XoK7GaHlQhgx/hIZl6Va0bF45RQOOwhLIy8lQDbuCiadSLCBnH2CFYquit5bw=="],
 
     "adwaveui/adwavecss": ["adwavecss@0.4.0", "", {}, "sha512-VSCHVgT3si0R0q3wUhiupe/zZDBGDQQc9K0VGPEG5yCZGhLWpTLgB0elRms71cTV9PyJ+DQtU7Xw6zGfsGc2sQ=="],
@@ -1257,8 +1253,6 @@
     "@electron/windows-sign/fs-extra/jsonfile": ["jsonfile@6.2.1", "", { "dependencies": { "universalify": "^2.0.0" }, "optionalDependencies": { "graceful-fs": "^4.1.6" } }, "sha512-zwOTdL3rFQ/lRdBnntKVOX6k5cKJwEc1HdilT71BWEu7J41gXIB2MRp+vxduPSwZJPWBxEzv4yH1wYLJGUHX4Q=="],
 
     "@electron/windows-sign/fs-extra/universalify": ["universalify@2.0.1", "", {}, "sha512-gptHNQghINnc/vTGIk0SOFGFNXw7JVrlRUtConJRlvaw6DuX0wO5Jeko9sWrMBhh+PsYAZ7oXAiOnf/UKogyiw=="],
-
-    "@ncpa0cpl/fs-explorer/adwaveui/wc_toolkit": ["wc_toolkit@0.1.2", "", {}, "sha512-L9UDOlos4Kevk4nHyCCsI70yd1LwJh7TjqmpSQNNIbMCSZ1uMdI7QCtQu4IN6SdNBjOHMxizRp7y0jKdeJmguA=="],
 
     "@typescript-eslint/utils/eslint-scope/estraverse": ["estraverse@4.3.0", "", {}, "sha512-39nnKffWz8xN1BU/2c79n9nB9HDzo0niYUqx6xyqUnyoAnQyyWpOTdZEeiCch8BBu515t4wp9ZmgVfVhn9EBpw=="],
 
